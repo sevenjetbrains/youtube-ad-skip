@@ -4,7 +4,7 @@
 //
 // Sélecteurs vérifiés dans le code du lecteur YouTube (base.js, version 22cb88bc,
 // octobre 2026) — voir docs/verification-selecteurs.md :
-//   - le lecteur est #movie_player (.html5-video-player) ;
+//   - le lecteur est #movie_player ;
 //   - le lecteur porte la classe « ad-showing » pendant une publicité ;
 //   - les publicités sont rendues dans div.video-ads.ytp-ad-module ;
 //   - le bouton « Ignorer » est un <button> portant l'une des classes de SKIP_BUTTON_CLASSES.
@@ -13,7 +13,9 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
 (function (ns) {
   "use strict";
 
-  const PLAYER_SELECTOR = "#movie_player, .html5-video-player";
+  // Uniquement l'id : la classe .html5-video-player est aussi portée par le lecteur
+  // d'aperçu au survol des miniatures, qui ne doit pas être surveillé.
+  const PLAYER_ID = "movie_player";
   const AD_SHOWING_CLASS = "ad-showing";
 
   // Du plus récent au plus ancien : YouTube garde plusieurs variantes en parallèle.
@@ -22,7 +24,7 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
 
   /** Renvoie l'élément du lecteur vidéo principal, ou null. */
   function findPlayer(doc) {
-    return doc.querySelector(PLAYER_SELECTOR);
+    return doc.getElementById(PLAYER_ID);
   }
 
   /** Vrai si le lecteur est en train de diffuser une publicité. */
@@ -91,9 +93,10 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
   }
 
   Object.assign(ns, {
-    PLAYER_SELECTOR,
+    PLAYER_ID,
     AD_SHOWING_CLASS,
     SKIP_BUTTON_CLASSES,
+    SKIP_BUTTON_SELECTOR,
     findPlayer,
     isAdShowing,
     isElementVisible,

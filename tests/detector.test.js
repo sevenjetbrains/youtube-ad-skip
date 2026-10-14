@@ -89,6 +89,15 @@ test("transitions pub → vidéo → pub (scénario 5)", () => {
   assert.equal(detector.getAdState(doc).state, "ad-skippable");
 });
 
+test("le lecteur d'aperçu des miniatures n'est pas pris pour le lecteur principal", () => {
+  const doc = createYouTubeDom({ ad: false }).window.document;
+  const preview = doc.createElement("div");
+  preview.className = "html5-video-player ad-showing";
+  doc.body.prepend(preview);
+  assert.equal(detector.findPlayer(doc).id, "movie_player");
+  assert.equal(detector.getAdState(doc).state, "no-ad");
+});
+
 test("isElementVisible : élément détaché ou null", () => {
   const doc = createYouTubeDom().window.document;
   assert.equal(detector.isElementVisible(null), false);
