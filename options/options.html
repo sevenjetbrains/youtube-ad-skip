@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paramètres — YouTube Ad Skip</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <header class="header">
+      <img src="../assets/icons/icon-48.png" alt="" width="40" height="40">
+      <h1>YouTube Ad Skip — paramètres</h1>
+    </header>
+
+    <p class="intro">Les réglages sont enregistrés dans votre navigateur dès qu'ils changent et conservés après un redémarrage de Chrome. Ils s'appliquent tout de suite aux onglets YouTube ouverts.</p>
+
+    <section class="settings">
+      <label class="setting">
+        <span class="setting-text">
+          <span class="setting-title">Activer l'extension</span>
+          <span class="setting-hint">Interrupteur général, aussi disponible dans la fenêtre de l'extension.</span>
+        </span>
+        <input type="checkbox" data-setting="enabled" role="switch">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+
+      <label class="setting">
+        <span class="setting-text">
+          <span class="setting-title">Clic automatique sur « Ignorer »</span>
+          <span class="setting-hint">Clique sur le bouton dès qu'il est disponible. Chrome affiche alors brièvement le bandeau du débogueur.</span>
+        </span>
+        <input type="checkbox" data-setting="autoSkip" role="switch">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+
+      <label class="setting">
+        <span class="setting-text">
+          <span class="setting-title">Fonctions expérimentales <span class="badge">Expérimental</span></span>
+          <span class="setting-hint">Pendant une publicité, lecture accélérée (×8) et son coupé, surtout utile pour les publicités non ignorables. Vitesse et son sont rétablis à la fin de la publicité.</span>
+          <span class="setting-warning">YouTube peut voir ce changement de vitesse et y réagir (avertissement, lecture interrompue). À utiliser en connaissance de cause.</span>
+        </span>
+        <input type="checkbox" data-setting="experimental" role="switch">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+    </section>
+
+    <p class="saved" id="saved" aria-live="polite"></p>
+
+    <p class="footer"><a href="../help/help.html">Aide et informations</a></p>
+  </main>
+
+  <script src="../common/settings.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

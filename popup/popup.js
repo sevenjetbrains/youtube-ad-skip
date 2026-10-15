@@ -5,25 +5,42 @@
 // aucune permission « tabs » n'est nécessaire.
 "use strict";
 
-const ENABLED_KEY = "enabled";
 const SESSION_COUNT_KEY = "sessionSkipped";
 const TOTAL_COUNT_KEY = "totalSkipped";
 const STATUS_REFRESH_MS = 1000;
 
-/** Texte et couleur de l'indicateur selon la réponse du content script (null = pas de réponse). */
-function describeStatus(enabledSetting, reply) {
-  if (!enabledSetting) return { tone: "muted", text: "En pause" };
+/**
+ * Texte et couleur de l'indicateur.
+ * @param {{enabled: boolean, autoSkip: boolean, experimental: boolean}} settings
+ * @param {{enabled: boolean, state: string} | null} reply réponse du content script (null = aucune)
+ */
+function describeStatus(settings, reply) {
+  if (!settings.enabled) return { tone: "muted", text: "En pause" };
+  if (!settings.autoSkip && !settings.experimental) {
+    return { tone: "muted", text: "En pause — clic automatique désactivé dans les paramètres" };
+  }
   if (!reply) return { tone: "muted", text: "Inactif sur cet onglet — ouvrez ou rechargez une page YouTube" };
   if (!reply.enabled) return { tone: "muted", text: "Démarrage…" };
+  const accelerated = settings.experimental ? " — lecture accélérée" : "";
   switch (reply.state) {
     case "no-player":
       return { tone: "ok", text: "Actif — en attente d'une vidéo" };
     case "no-ad":
       return { tone: "ok", text: "Actif — aucune publicité en cours" };
     case "ad-waiting":
-      return { tone: "warn", text: "Publicité en cours — bouton « Ignorer » pas encore disponible" };
+      return {
+        tone: "warn",
+        text: settings.experimental
+          ? "Publicité en cours — lecture accélérée"
+          : "Publicité en cours — bouton « Ignorer » pas encore disponible",
+      };
     case "ad-skippable":
-      return { tone: "warn", text: "Publicité en cours — clic sur « Ignorer »" };
+      return {
+        tone: "warn",
+        text: settings.autoSkip
+          ? "Publicité en cours — clic sur « Ignorer »"
+          : "Publicité en cours — clic automatique désactivé" + accelerated,
+      };
     default:
       return { tone: "muted", text: "État du lecteur inconnu" };
   }
@@ -43,24 +60,28 @@ async function queryActiveTabStatus() {
   }
 }
 
-function initPopup() {
+function initPopup(Settings) {
   const enabledInput = document.getElementById("enabled");
   const statusEl = document.getElementById("status");
   const statusText = document.getElementById("status-text");
   const sessionEl = document.getElementById("session-count");
   const totalEl = document.getElementById("total-count");
   const resetButton = document.getElementById("reset");
+  let settings = Settings.normalizeSettings({});
 
   async function refreshStatus() {
-    const { tone, text } = describeStatus(enabledInput.checked, await queryActiveTabStatus());
+    const { tone, text } = describeStatus(settings, await queryActiveTabStatus());
     statusEl.dataset.tone = tone;
     statusText.textContent = text;
   }
 
-  chrome.storage.local.get({ [ENABLED_KEY]: true, [TOTAL_COUNT_KEY]: 0 }).then((values) => {
-    enabledInput.checked = values[ENABLED_KEY] !== false;
-    totalEl.textContent = formatCount(values[TOTAL_COUNT_KEY]);
+  Settings.loadSettings(chrome.storage.local).then((loaded) => {
+    settings = loaded;
+    enabledInput.checked = settings.enabled;
     refreshStatus();
+  });
+  chrome.storage.local.get({ [TOTAL_COUNT_KEY]: 0 }).then((values) => {
+    totalEl.textContent = formatCount(values[TOTAL_COUNT_KEY]);
   });
   chrome.storage.session.get({ [SESSION_COUNT_KEY]: 0 }).then((values) => {
     sessionEl.textContent = formatCount(values[SESSION_COUNT_KEY]);
@@ -73,15 +94,16 @@ function initPopup() {
     if (area === "local" && changes[TOTAL_COUNT_KEY]) {
       totalEl.textContent = formatCount(changes[TOTAL_COUNT_KEY].newValue);
     }
-    if (area === "local" && changes[ENABLED_KEY]) {
-      enabledInput.checked = changes[ENABLED_KEY].newValue !== false;
+    const next = Settings.applySettingChanges(settings, changes, area);
+    if (next) {
+      settings = next;
+      enabledInput.checked = settings.enabled;
       refreshStatus();
     }
   });
 
   enabledInput.addEventListener("change", async () => {
-    await chrome.storage.local.set({ [ENABLED_KEY]: enabledInput.checked });
-    refreshStatus();
+    await chrome.storage.local.set({ enabled: enabledInput.checked });
   });
 
   resetButton.addEventListener("click", async () => {
@@ -93,11 +115,13 @@ function initPopup() {
     }
   });
 
+  document.getElementById("open-options").addEventListener("click", () => chrome.runtime.openOptionsPage());
+
   setInterval(refreshStatus, STATUS_REFRESH_MS);
 }
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { describeStatus, formatCount };
 } else {
-  initPopup();
+  initPopup(YtAdSkipSettings);
 }

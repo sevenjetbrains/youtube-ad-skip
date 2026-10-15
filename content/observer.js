@@ -131,18 +131,19 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
     };
   }
 
-  const ENABLED_KEY = "enabled"; // réglage global, partagé avec la popup (chrome.storage.local)
+  const Settings = globalThis.YtAdSkipSettings; // common/settings.js, chargé avant ce fichier
 
   /**
    * Relie la surveillance aux réglages et à la popup.
-   *   - démarre ou arrête la surveillance selon le réglage « enabled » (activé par défaut),
-   *     y compris en pleine lecture lorsque l'utilisateur bascule l'interrupteur ;
+   *   - applique les réglages enregistrés (activation globale, clic automatique, fonction
+   *     expérimentale) au chargement et dès qu'ils changent, y compris en pleine lecture ;
    *   - signale chaque publicité réellement ignorée au service worker, qui tient les compteurs ;
    *   - répond à la popup qui demande l'état de l'onglet (« get-status »).
    * @param {{doc: Document, chromeApi: typeof chrome}} opts
    */
   function startContentScript({ doc, chromeApi }) {
-    let enabled = false;
+    let settings = null; // null tant que les réglages ne sont pas lus
+    const isActive = () => Boolean(settings && Settings.isActive(settings));
 
     function notify(message) {
       // Échoue si l'extension a été rechargée sans recharger l'onglet : sans conséquence.
@@ -159,29 +160,33 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
         notify({ type: "ad-skipped" });
       },
     });
-    const watcher = createAdWatcher({ doc, onCheck: (info) => enabled && skipper.handle(info) });
+    const accelerator = new ns.AdAccelerator();
 
-    function setEnabled(next) {
-      if (next === enabled) return;
-      enabled = next;
-      if (enabled) {
-        watcher.start();
-      } else {
-        watcher.stop();
-        skipper.reset();
-      }
+    function onCheck(info) {
+      if (!isActive()) return;
+      if (settings.experimental) accelerator.handle(info);
+      if (settings.autoSkip) skipper.handle(info);
+    }
+    const watcher = createAdWatcher({ doc, onCheck });
+
+    function applySettings(next) {
+      const wasActive = isActive();
+      settings = Settings.normalizeSettings(next);
+      if (!settings.enabled || !settings.experimental) accelerator.restore();
+      if (!settings.enabled || !settings.autoSkip) skipper.reset();
+      if (isActive() && !wasActive) watcher.start();
+      if (!isActive() && wasActive) watcher.stop();
     }
 
     chromeApi.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && changes[ENABLED_KEY]) setEnabled(changes[ENABLED_KEY].newValue !== false);
+      if (!settings) return; // la lecture initiale, postérieure, verra déjà la nouvelle valeur
+      const next = Settings.applySettingChanges(settings, changes, area);
+      if (next) applySettings(next);
     });
-    chromeApi.storage.local.get({ [ENABLED_KEY]: true }).then(
-      (values) => setEnabled(values[ENABLED_KEY] !== false),
-      (error) => {
-        console.warn("[YouTube Ad Skip] réglages illisibles, activation par défaut :", error);
-        setEnabled(true);
-      }
-    );
+    Settings.loadSettings(chromeApi.storage.local).then(applySettings, (error) => {
+      console.warn("[YouTube Ad Skip] réglages illisibles, valeurs par défaut :", error);
+      applySettings(Settings.DEFAULT_SETTINGS);
+    });
 
     chromeApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!message || message.type !== "get-status" || sender.id !== chromeApi.runtime.id) return false;
@@ -191,16 +196,26 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
       } catch (error) {
         console.warn("[YouTube Ad Skip] erreur de détection :", error);
       }
-      sendResponse({ enabled, state });
+      sendResponse({ enabled: isActive(), state });
       return false;
     });
 
-    return { watcher, skipper, setEnabled, get enabled() { return enabled; } };
+    return {
+      watcher,
+      skipper,
+      accelerator,
+      applySettings,
+      get settings() {
+        return settings;
+      },
+      get enabled() {
+        return isActive();
+      },
+    };
   }
 
   ns.createAdWatcher = createAdWatcher;
   ns.startContentScript = startContentScript;
-  ns.ENABLED_KEY = ENABLED_KEY;
 
   const inExtension = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id;
   if (inExtension) ns.contentScript = startContentScript({ doc: document, chromeApi: chrome });

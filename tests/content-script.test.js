@@ -2,8 +2,10 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createYouTubeDom } = require("./helpers/youtube-dom");
 const { createFakeStorage } = require("./helpers/fake-storage");
+const Settings = require("../common/settings.js");
 require("../content/detector.js");
 require("../content/ad-skipper.js");
+require("../content/ad-accelerator.js");
 const ns = require("../content/observer.js");
 
 const tick = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -17,9 +19,10 @@ async function waitFor(condition, timeoutMs = 2000) {
   }
 }
 
-function setup({ local = {}, ad = false } = {}) {
+const OFF = { enabled: false, autoSkip: false, experimental: false };
+
+function setup({ local = {}, ad = false, storage = createFakeStorage({ local }) } = {}) {
   const doc = createYouTubeDom({ ad }).window.document;
-  const storage = createFakeStorage({ local });
   const sent = [];
   const messageListeners = [];
   const chromeApi = {
@@ -40,28 +43,48 @@ function setup({ local = {}, ad = false } = {}) {
     for (const fn of messageListeners) fn({ type: "get-status" }, sender, (r) => (reply = r));
     return reply;
   }
-  return { doc, storage, sent, cs, askStatus };
+  const video = doc.querySelector("video");
+  return { doc, video, storage, sent, cs, askStatus, stop: () => cs.applySettings(OFF) };
 }
 
-test("activé par défaut lorsqu'aucun réglage n'est enregistré", async () => {
+test("réglages par défaut lorsqu'aucun n'est enregistré : clic automatique seul", async () => {
   const ctx = setup();
   await waitFor(() => ctx.cs.watcher.debugState.playerObserver);
-  assert.equal(ctx.cs.enabled, true);
-  ctx.cs.setEnabled(false);
+  assert.deepEqual(ctx.cs.settings, Settings.DEFAULT_SETTINGS);
+  ctx.stop();
 });
 
-test("réglage « désactivé » respecté au chargement : aucune surveillance", async () => {
-  const ctx = setup({ local: { [ns.ENABLED_KEY]: false } });
-  await tick(50);
+test("extension désactivée au chargement : aucune surveillance", async () => {
+  const ctx = setup({ local: { enabled: false } });
+  await waitFor(() => ctx.cs.settings);
   assert.equal(ctx.cs.enabled, false);
   assert.equal(ctx.cs.watcher.debugState.playerObserver, false);
+});
+
+test("clic automatique et expérimental désactivés : aucune surveillance", async () => {
+  const ctx = setup({ local: { autoSkip: false, experimental: false } });
+  await waitFor(() => ctx.cs.settings);
+  assert.equal(ctx.cs.watcher.debugState.playerObserver, false);
+});
+
+test("réglages conservés après un redémarrage de Chrome (scénario 8)", async () => {
+  const storage = createFakeStorage(); // chrome.storage.local survit au redémarrage
+  const before = setup({ storage });
+  await waitFor(() => before.cs.settings);
+  await storage.local.set({ autoSkip: false, experimental: true }); // choix faits dans les options
+  before.stop(); // fermeture de l'onglet
+
+  const after = setup({ storage }); // nouvel onglet après redémarrage
+  await waitFor(() => after.cs.settings);
+  assert.deepEqual(after.cs.settings, { enabled: true, autoSkip: false, experimental: true });
+  after.stop();
 });
 
 test("désactivation pendant une publicité : surveillance arrêtée, aucun clic (scénario 6)", async () => {
   const ctx = setup({ ad: true });
   await waitFor(() => ctx.cs.watcher.debugState.adObserver);
 
-  await ctx.storage.local.set({ [ns.ENABLED_KEY]: false }); // l'utilisateur bascule l'interrupteur
+  await ctx.storage.local.set({ enabled: false }); // l'utilisateur bascule l'interrupteur
   assert.deepEqual(ctx.cs.watcher.debugState, {
     player: null,
     playerObserver: false,
@@ -70,17 +93,48 @@ test("désactivation pendant une publicité : surveillance arrêtée, aucun clic
     polling: false,
   });
 
-  await ctx.storage.local.set({ [ns.ENABLED_KEY]: true }); // et le réactive
+  await ctx.storage.local.set({ enabled: true }); // et le réactive
   await waitFor(() => ctx.cs.watcher.debugState.adObserver);
-  ctx.cs.setEnabled(false);
+  ctx.stop();
   assert.deepEqual(ctx.sent, [], "pub sans bouton « Ignorer » : aucun message envoyé");
+});
+
+test("expérimental désactivé (défaut) : la vitesse des publicités n'est pas touchée", async () => {
+  const ctx = setup({ ad: true });
+  await waitFor(() => ctx.cs.watcher.debugState.adObserver);
+  await tick(20);
+  assert.equal(ctx.video.playbackRate, 1);
+  assert.equal(ctx.video.muted, false);
+  ctx.stop();
+});
+
+test("expérimental activé en pleine publicité puis désactivé : vitesse et son rétablis", async () => {
+  const ctx = setup({ ad: true });
+  await waitFor(() => ctx.cs.watcher.debugState.adObserver);
+  await ctx.storage.local.set({ experimental: true });
+  await waitFor(() => ctx.video.playbackRate === ns.AD_PLAYBACK_RATE); // vérification de secours (500 ms)
+  assert.equal(ctx.video.muted, true);
+
+  await ctx.storage.local.set({ experimental: false });
+  assert.equal(ctx.video.playbackRate, 1);
+  assert.equal(ctx.video.muted, false);
+  ctx.stop();
+});
+
+test("fin de publicité avec expérimental : vidéo rétablie", async () => {
+  const ctx = setup({ ad: true, local: { experimental: true } });
+  await waitFor(() => ctx.video.playbackRate === ns.AD_PLAYBACK_RATE);
+  ctx.doc.getElementById("movie_player").classList.remove("ad-showing", "ad-interrupting");
+  await waitFor(() => ctx.video.playbackRate === 1);
+  assert.equal(ctx.video.muted, false);
+  ctx.stop();
 });
 
 test("répond à la popup avec l'état du lecteur", async () => {
   const ctx = setup({ ad: true });
   await waitFor(() => ctx.cs.enabled);
   assert.deepEqual(ctx.askStatus(), { enabled: true, state: "ad-waiting" });
-  ctx.cs.setEnabled(false);
+  ctx.stop();
   assert.deepEqual(ctx.askStatus(), { enabled: false, state: "ad-waiting" });
   assert.equal(ctx.askStatus({ id: "autre-extension" }), undefined, "autre expéditeur ignoré");
 });
@@ -91,5 +145,5 @@ test("publicité ignorée signalée au service worker", async () => {
   ctx.cs.skipper.onSkipped();
   await waitFor(() => ctx.sent.length > 0);
   assert.deepEqual(ctx.sent, [{ type: "ad-skipped" }]);
-  ctx.cs.setEnabled(false);
+  ctx.stop();
 });

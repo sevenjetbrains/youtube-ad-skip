@@ -19,6 +19,12 @@
     </section>
 
     <section>
+      <h2>Paramètres</h2>
+      <p>Le lien « Paramètres » de la fenêtre ouvre la page d'options. On y trouve l'interrupteur général, le clic automatique sur « Ignorer » et les fonctions expérimentales. Les réglages sont conservés après un redémarrage de Chrome.</p>
+      <p><strong>Fonctions expérimentales</strong> (désactivées par défaut) : pendant une publicité, la lecture est accélérée (×8) et le son coupé, puis tout est rétabli à la fin de la publicité. YouTube peut voir ce changement de vitesse et y réagir : à utiliser en connaissance de cause.</p>
+    </section>
+
+    <section>
       <h2>Le bandeau « a commencé à déboguer ce navigateur »</h2>
       <p>YouTube ignore les clics simulés par un script. Pour produire un vrai clic, l'extension utilise l'API <code>chrome.debugger</code> de Chrome. À chaque clic, Chrome affiche donc brièvement ce bandeau : c'est normal, l'extension se détache aussitôt.</p>
       <p>Pour un usage personnel, le bandeau disparaît si Chrome est lancé avec l'option <code>--silent-debugger-extension-api</code>.</p>
@@ -27,7 +33,7 @@
     <section>
       <h2>Limites</h2>
       <ul>
-        <li>Les publicités <strong>non ignorables</strong> (sans bouton « Ignorer ») sont lues normalement.</li>
+        <li>Les publicités <strong>non ignorables</strong> (sans bouton « Ignorer ») sont lues normalement, sauf si les fonctions expérimentales sont activées : elles sont alors accélérées, pas supprimées.</li>
         <li>L'extension ne bloque pas les publicités avant leur affichage.</li>
         <li>Seul <code>www.youtube.com</code> est couvert : pas m.youtube.com, YouTube Music ni les vidéos intégrées à d'autres sites.</li>
         <li>Si une autre extension est déjà attachée à l'onglet comme débogueur, le clic échoue : la publicité n'est alors pas comptée.</li>
@@ -49,7 +55,7 @@
       <h2>En cas de problème</h2>
       <ul>
         <li>L'indicateur affiche « Inactif sur cet onglet » : rechargez la page YouTube (nécessaire après l'installation ou la mise à jour de l'extension).</li>
-        <li>Vérifiez que l'interrupteur de la fenêtre est activé.</li>
+        <li>Vérifiez que l'interrupteur de la fenêtre est activé, et le clic automatique dans les paramètres.</li>
         <li>Désactivez les autres extensions qui utilisent le débogueur sur cet onglet.</li>
       </ul>
     </section>

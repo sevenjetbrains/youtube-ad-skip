@@ -21,10 +21,20 @@
       "32": "assets/icons/icon-32.png"
     }
   },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["content/detector.js", "content/ad-skipper.js", "content/observer.js"],
+      "js": [
+        "common/settings.js",
+        "content/detector.js",
+        "content/ad-skipper.js",
+        "content/ad-accelerator.js",
+        "content/observer.js"
+      ],
       "run_at": "document_idle"
     }
   ]

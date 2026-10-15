@@ -2,14 +2,26 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { describeStatus, formatCount } = require("../popup/popup.js");
 
-test("indicateur d'état selon le réglage et la réponse de l'onglet", () => {
-  assert.equal(describeStatus(false, { enabled: true, state: "no-ad" }).text, "En pause");
-  assert.match(describeStatus(true, null).text, /Inactif sur cet onglet/);
-  assert.equal(describeStatus(true, { enabled: true, state: "no-ad" }).tone, "ok");
-  assert.equal(describeStatus(true, { enabled: true, state: "no-player" }).tone, "ok");
-  assert.equal(describeStatus(true, { enabled: true, state: "ad-waiting" }).tone, "warn");
-  assert.equal(describeStatus(true, { enabled: true, state: "ad-skippable" }).tone, "warn");
-  assert.match(describeStatus(true, { enabled: true, state: "bizarre" }).text, /inconnu/);
+const DEFAULTS = { enabled: true, autoSkip: true, experimental: false };
+const active = (state) => ({ enabled: true, state });
+
+test("indicateur d'état selon les réglages et la réponse de l'onglet", () => {
+  assert.equal(describeStatus({ ...DEFAULTS, enabled: false }, active("no-ad")).text, "En pause");
+  assert.match(describeStatus({ ...DEFAULTS, autoSkip: false }, active("no-ad")).text, /désactivé dans les paramètres/);
+  assert.match(describeStatus(DEFAULTS, null).text, /Inactif sur cet onglet/);
+  assert.equal(describeStatus(DEFAULTS, active("no-ad")).tone, "ok");
+  assert.equal(describeStatus(DEFAULTS, active("no-player")).tone, "ok");
+  assert.equal(describeStatus(DEFAULTS, active("ad-waiting")).tone, "warn");
+  assert.match(describeStatus(DEFAULTS, active("ad-skippable")).text, /clic sur « Ignorer »/);
+  assert.match(describeStatus(DEFAULTS, active("bizarre")).text, /inconnu/);
+});
+
+test("indicateur avec la fonction expérimentale", () => {
+  const exp = { ...DEFAULTS, experimental: true };
+  assert.match(describeStatus(exp, active("ad-waiting")).text, /accélérée/);
+  const expOnly = { ...exp, autoSkip: false };
+  assert.equal(describeStatus(expOnly, active("no-ad")).tone, "ok", "expérimental seul : actif");
+  assert.match(describeStatus(expOnly, active("ad-skippable")).text, /clic automatique désactivé — lecture accélérée/);
 });
 
 test("formatage des compteurs", () => {

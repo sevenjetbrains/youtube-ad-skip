@@ -32,6 +32,18 @@ Un clic déclenché par script (`element.click()` ou `dispatchEvent`) a `isTrust
 
 Le lecteur journalise aussi la provenance des déplacements dans la vidéo (seek) pendant une publicité (`BISCOTTI_BASED_DETECTION_STATE_AS_SEEK_EVENT_NOT_TRUSTED`). Les avances programmées sont donc détectables par YouTube.
 
+## Vidéo et vitesse de lecture (fonction expérimentale)
+
+**Date :** 15 octobre 2026. **Source :** `base.js` version `21090930`.
+
+| Élément | Preuve dans `base.js` | Utilisation dans l'extension |
+|---|---|---|
+| `video.html5-main-video` | `g.ZN(W,"video-stream");g.ZN(W,g.V4.MAIN_VIDEO)` avec `MAIN_VIDEO:"html5-main-video"` | Vidéo accélérée pendant une publicité |
+
+- L'événement `ratechange` sert seulement à la lecture (`this.loader.setPlaybackRate(…)`). Il ne déclenche pas `onAbnormalityDetected`, contrairement aux clics simulés.
+- Pour certaines publicités, le lecteur remet lui-même la vitesse à 1 (`isLifaAdPlaying()?(…this.api.setPlaybackRate(1))`). L'extension réapplique donc la vitesse à chaque vérification.
+- **Limite :** à chaque événement de la vidéo, le lecteur établit un rapport d'état qui contient notamment `playbackRate` (`[136]:K.playbackRate`) et `muted` (`[120]:K.muted`). YouTube peut donc voir l'accélération. La fonction reste expérimentale et désactivée par défaut.
+
 ## Méthode de vérification
 
 ```sh
