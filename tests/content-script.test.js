@@ -1,3 +1,20 @@
+// =============================================================================
+// Tests de content/observer.js (partie démarrage : startContentScript)
+// =============================================================================
+//
+// Vérifie le lien entre la surveillance, les réglages et le reste de l'extension :
+// application des réglages au chargement et en pleine lecture, conservation après
+// redémarrage, fonction expérimentale, réponse à la popup, signalement des publicités
+// ignorées, arrêt propre quand l'extension est rechargée sans recharger l'onglet.
+// L'API chrome est entièrement simulée (faux runtime + helpers/fake-storage.js).
+// waitFor() attend une condition plutôt qu'un délai fixe : les tests restent fiables
+// même quand Node les exécute en parallèle sur une machine chargée.
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/content-script.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createYouTubeDom } = require("./helpers/youtube-dom");
@@ -19,8 +36,16 @@ async function waitFor(condition, timeoutMs = 2000) {
   }
 }
 
+/** Réglages qui arrêtent tout : utilisés en fin de test pour libérer observateurs et minuteurs. */
 const OFF = { enabled: false, autoSkip: false, experimental: false };
 
+/**
+ * Démarre le content script sur un faux lecteur, avec une fausse API chrome.
+ * @param {object} [opts]
+ * @param {object} [opts.local] réglages déjà enregistrés dans chrome.storage.local
+ * @param {boolean} [opts.ad] publicité en cours au démarrage
+ * @param {object} [opts.storage] stockage partagé (pour simuler un redémarrage)
+ */
 function setup({ local = {}, ad = false, storage = createFakeStorage({ local }) } = {}) {
   const doc = createYouTubeDom({ ad }).window.document;
   const sent = [];

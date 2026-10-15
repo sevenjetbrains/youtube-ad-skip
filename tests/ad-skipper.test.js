@@ -1,10 +1,32 @@
+// =============================================================================
+// Tests de content/ad-skipper.js — clic automatique et vérification du résultat
+// =============================================================================
+//
+// Le service worker est remplacé par un faux pont (bridge) qui enregistre les messages
+// envoyés dans « sent » et renvoie des réponses choisies par chaque test. jsdom n'ayant
+// pas de mise en page, la position du bouton (getBoundingClientRect) et l'élément au
+// premier plan (elementFromPoint) sont simulés. Les délais sont ramenés à 0 et l'horloge
+// est contrôlée (advance) pour tester l'espacement des tentatives sans attendre.
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/ad-skipper.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createYouTubeDom } = require("./helpers/youtube-dom");
 require("../content/detector.js");
 const ns = require("../content/ad-skipper.js");
 
-/** DOM avec bouton « Ignorer » positionné et non recouvert (jsdom n'a pas de mise en page). */
+/**
+ * Prépare un faux lecteur pendant une publicité, avec un bouton « Ignorer » visible.
+ * @param {object} [opts]
+ * @param {string} [opts.skipClass] classe du bouton (permet de tester les trois variantes)
+ * @param {boolean} [opts.covered] simule un élément posé par-dessus le bouton
+ * @param {object} [opts.bridgeReplies] réponses du faux service worker, par type de message
+ *        (objet fixe, ou fonction appelée avec le message pour simuler un effet sur la page)
+ */
 function setup({ skipClass = "ytp-skip-ad-button", covered = false, bridgeReplies = {} } = {}) {
   const doc = createYouTubeDom({ ad: true, skipClass }).window.document;
   const button = doc.querySelector("button." + skipClass);

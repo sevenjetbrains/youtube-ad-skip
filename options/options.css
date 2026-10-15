@@ -1,3 +1,11 @@
+/*
+ * options/options.css — apparence de la page de paramètres (options.html)
+ *
+ * Mêmes couleurs et même interrupteur que la popup, pour une apparence cohérente.
+ * Le thème suit automatiquement le mode clair ou sombre du système.
+ */
+
+/* Couleurs du thème clair */
 :root {
   --bg: #ffffff;
   --surface: #f3f4f8;
@@ -9,6 +17,7 @@
   --track: #c5c8d3;
 }
 
+/* Couleurs du thème sombre */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1d1f27;
@@ -34,6 +43,7 @@ body {
   font: 15px/1.5 system-ui, "Segoe UI", sans-serif;
 }
 
+/* Colonne centrée, de largeur limitée pour rester lisible sur grand écran */
 main {
   max-width: 640px;
   margin: 0 auto;
@@ -54,6 +64,7 @@ h1 {
   color: var(--muted);
 }
 
+/* Liste des réglages, chacun dans un bloc cliquable */
 .settings {
   display: flex;
   flex-direction: column;
@@ -87,11 +98,13 @@ h1 {
   font-size: 13px;
 }
 
+/* Avertissement de la fonction expérimentale (orange) */
 .setting-warning {
   color: var(--warn);
   font-size: 13px;
 }
 
+/* Étiquette « Expérimental » à côté du titre */
 .badge {
   margin-left: 6px;
   padding: 1px 6px;
@@ -145,6 +158,7 @@ h1 {
   outline-offset: 2px;
 }
 
+/* Message « Enregistré. » (vert) ou d'erreur (rouge, attribut data-error) */
 .saved {
   min-height: 1.5em;
   color: var(--ok);

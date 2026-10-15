@@ -1,3 +1,16 @@
+// =============================================================================
+// Tests de popup/popup.js — fonctions pures de la fenêtre
+// =============================================================================
+//
+// describeStatus() et formatCount() ne dépendent ni de Chrome ni du DOM : on les teste
+// directement. Le reste de la popup (lecture du stockage, interrupteur, boutons) est
+// vérifié manuellement dans Chrome (docs/procedure-test-manuel.md).
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/popup.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { describeStatus, formatCount } = require("../popup/popup.js");

@@ -1,8 +1,25 @@
+// =============================================================================
+// Tests de background.js — service worker (vrais clics et statistiques)
+// =============================================================================
+//
+// Une fausse API chrome est installée AVANT de charger background.js (qui s'en sert dès
+// son chargement pour enregistrer ses écouteurs). chrome.debugger y enregistre chaque
+// appel dans « calls », ce qui permet de vérifier l'ordre exact : attachement, appui,
+// relâchement, détachement. Les tests vérifient aussi le contrôle des expéditeurs, la file
+// d'attente des compteurs (aucun incrément perdu) et le détachement automatique.
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/background.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
 const { createFakeStorage } = require("./helpers/fake-storage");
 
 // Fausse API chrome minimale, installée avant le chargement du service worker.
+// « calls » garde la trace de chaque appel à chrome.debugger ; « attachError » permet à un
+// test de simuler un refus d'attachement (par exemple : autre débogueur déjà présent).
 const calls = [];
 let attachError = null;
 const storage = createFakeStorage();
@@ -33,6 +50,8 @@ const bg = require("../background.js");
 const youtubeSender = { id: "ext-id", tab: { id: 7 }, frameId: 0, url: "https://www.youtube.com/watch?v=x" };
 const popupSender = { id: "ext-id", url: "chrome-extension://ext-id/popup/popup.html" };
 
+// Avant chaque test : détacher les onglets restants, vider l'historique des appels et le
+// stockage, pour que les tests restent indépendants les uns des autres.
 beforeEach(async () => {
   for (const tabId of [...bg.attachedTabs.keys()]) await bg.handleMessage({ type: "debugger-detach" }, { tab: { id: tabId } });
   calls.length = 0;

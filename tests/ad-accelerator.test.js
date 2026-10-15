@@ -1,3 +1,17 @@
+// =============================================================================
+// Tests de content/ad-accelerator.js — fonction expérimentale (vitesse ×8, son coupé)
+// =============================================================================
+//
+// Vérifie qu'une vidéo ordinaire n'est jamais modifiée, que la publicité est accélérée et
+// rendue muette, et que la fin de la publicité rétablit les valeurs d'origine sans écraser
+// ce que l'utilisateur ou YouTube ont réglé entre-temps. jsdom gère playbackRate et muted
+// sur l'élément <video>, sans lire réellement de vidéo.
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/ad-accelerator.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createYouTubeDom } = require("./helpers/youtube-dom");

@@ -1,3 +1,18 @@
+// =============================================================================
+// Tests de content/detector.js — détection de l'état publicitaire
+// =============================================================================
+//
+// Vérifie, sur un faux lecteur YouTube construit avec jsdom (helpers/youtube-dom.js), que
+// getAdState() renvoie le bon état (no-player, no-ad, ad-waiting, ad-skippable) et que le
+// détecteur ne retient JAMAIS un autre bouton que le bouton « Ignorer » d'une publicité :
+// boutons ordinaires du lecteur, bouton hors du lecteur, élément qui n'est pas un bouton,
+// bouton résiduel hors publicité, lecteur d'aperçu des miniatures.
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/detector.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createYouTubeDom } = require("./helpers/youtube-dom");

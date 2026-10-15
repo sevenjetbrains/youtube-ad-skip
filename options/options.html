@@ -1,4 +1,13 @@
 <!doctype html>
+<!--
+  options/options.html — page de paramètres
+  (déclarée dans « options_ui » du manifest, ouverte dans un onglet).
+
+  Chaque interrupteur porte un attribut data-setting égal au nom du réglage dans
+  common/settings.js ; options.js s'en sert pour lire et enregistrer la valeur.
+  Pour ajouter un réglage : le déclarer dans DEFAULT_SETTINGS, puis copier un bloc
+  <label class="setting"> ci-dessous avec le nouveau data-setting.
+-->
 <html lang="fr">
 <head>
   <meta charset="utf-8">
@@ -15,7 +24,9 @@
 
     <p class="intro">Les réglages sont enregistrés dans votre navigateur dès qu'ils changent et conservés après un redémarrage de Chrome. Ils s'appliquent tout de suite aux onglets YouTube ouverts.</p>
 
+    <!-- Liste des réglages : un <label class="setting"> cliquable par réglage. -->
     <section class="settings">
+      <!-- Réglage « enabled » : interrupteur général (le même que dans la popup). -->
       <label class="setting">
         <span class="setting-text">
           <span class="setting-title">Activer l'extension</span>
@@ -25,6 +36,7 @@
         <span class="switch" aria-hidden="true"></span>
       </label>
 
+      <!-- Réglage « autoSkip » : clic réel via chrome.debugger (content/ad-skipper.js). -->
       <label class="setting">
         <span class="setting-text">
           <span class="setting-title">Clic automatique sur « Ignorer »</span>
@@ -34,6 +46,7 @@
         <span class="switch" aria-hidden="true"></span>
       </label>
 
+      <!-- Réglage « experimental » : accélération des publicités (content/ad-accelerator.js). Désactivé par défaut. -->
       <label class="setting">
         <span class="setting-text">
           <span class="setting-title">Fonctions expérimentales <span class="badge">Expérimental</span></span>
@@ -45,11 +58,13 @@
       </label>
     </section>
 
+    <!-- Message « Enregistré. » ou d'erreur, écrit par options.js. -->
     <p class="saved" id="saved" aria-live="polite"></p>
 
     <p class="footer"><a href="../help/help.html">Aide et informations</a></p>
   </main>
 
+  <!-- settings.js d'abord : options.js utilise l'objet YtAdSkipSettings qu'il définit. -->
   <script src="../common/settings.js"></script>
   <script src="options.js"></script>
 </body>

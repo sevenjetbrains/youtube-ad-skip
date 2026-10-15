@@ -1,3 +1,16 @@
+// =============================================================================
+// Tests de common/settings.js — réglages et valeurs par défaut
+// =============================================================================
+//
+// Vérifie les valeurs par défaut (activé, clic automatique, expérimental désactivé), la
+// correction des valeurs invalides, l'application des événements chrome.storage.onChanged
+// et la règle qui décide si la surveillance du lecteur est utile.
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/settings.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createFakeStorage } = require("./helpers/fake-storage");

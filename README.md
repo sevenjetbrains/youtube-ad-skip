@@ -76,6 +76,21 @@ tools/generate_icons.py    Génération des icônes
 
 Écarts avec l'arborescence proposée par le cahier des charges : `common/settings.js` évite de dupliquer les réglages entre content scripts, fenêtre et options ; `help/` est la page d'aide demandée en 2.4 ; `content/ad-accelerator.js` isole la fonction expérimentale.
 
+### Lire le code
+
+Chaque fichier commence par un en-tête qui explique son rôle, et le code est commenté en détail. Ordre de lecture conseillé : `content/detector.js` → `content/ad-skipper.js` → `background.js` → `content/observer.js` → `common/settings.js` → `content/ad-accelerator.js` → `popup/popup.js` → `options/options.js`.
+
+`manifest.json` ne peut pas contenir de commentaires (format JSON). Ses champs :
+
+| Champ | Rôle |
+|---|---|
+| `manifest_version: 3` | Format Manifest V3 exigé par le cahier des charges |
+| `permissions` | `debugger` (vrai clic) et `storage` (réglages, compteurs) |
+| `background.service_worker` | `background.js` |
+| `action.default_popup` | Fenêtre ouverte au clic sur l'icône |
+| `options_ui` | Page de paramètres, ouverte dans un onglet (`open_in_tab`) |
+| `content_scripts` | Scripts injectés sur `https://www.youtube.com/*` uniquement, dans cet ordre : `common/settings.js`, `detector.js`, `ad-skipper.js`, `ad-accelerator.js`, `observer.js` (le dernier démarre l'extension et utilise les précédents) ; `run_at: document_idle` = après le chargement de la page |
+
 ### Déroulement
 
 1. `observer.js` lit les réglages, puis surveille la classe `ad-showing` du lecteur `#movie_player`. Pendant une publicité seulement, il observe aussi le conteneur `.video-ads` et vérifie toutes les 500 ms (une transition CSS ne produit pas toujours de mutation). Il suit l'événement `yt-navigate-finish` de la navigation interne.

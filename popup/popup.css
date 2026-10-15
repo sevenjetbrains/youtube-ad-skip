@@ -1,3 +1,12 @@
+/*
+ * popup/popup.css — apparence de la fenêtre de l'extension (popup.html)
+ *
+ * Les couleurs sont définies une seule fois sous forme de variables CSS (--bg, --text…),
+ * puis redéfinies pour le thème sombre : la fenêtre suit automatiquement le thème clair
+ * ou sombre du système (prefers-color-scheme).
+ */
+
+/* Couleurs du thème clair */
 :root {
   --bg: #ffffff;
   --surface: #f3f4f8;
@@ -9,6 +18,7 @@
   --track: #c5c8d3;
 }
 
+/* Couleurs du thème sombre (appliquées si le système est en mode sombre) */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1d1f27;
@@ -22,10 +32,12 @@
   }
 }
 
+/* La largeur des éléments inclut leurs marges intérieures et bordures (calculs plus simples). */
 * {
   box-sizing: border-box;
 }
 
+/* Largeur fixe de la fenêtre ; max-width évite tout débordement horizontal. */
 body {
   margin: 0;
   padding: 16px;
@@ -48,7 +60,12 @@ body {
   font-size: 16px;
 }
 
-/* Interrupteur */
+/*
+ * Interrupteur
+ * La vraie case à cocher est rendue invisible (mais reste utilisable au clavier) ;
+ * .switch dessine la piste, et son pseudo-élément ::after dessine la pastille ronde.
+ * Le sélecteur « input:checked + .switch » change l'apparence quand la case est cochée.
+ */
 .toggle {
   display: flex;
   align-items: center;
@@ -112,7 +129,7 @@ body {
   outline-offset: 2px;
 }
 
-/* État de fonctionnement */
+/* Indicateur d'état : pastille (.dot) dont la couleur dépend de data-tone */
 .status {
   display: flex;
   align-items: center;
@@ -140,7 +157,7 @@ body {
   background: var(--warn);
 }
 
-/* Statistiques */
+/* Statistiques : deux tuiles côte à côte (grille de deux colonnes égales) */
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -167,6 +184,7 @@ body {
   font-size: 12px;
 }
 
+/* Pied de fenêtre : liens d'action, renvoyés à la ligne si la place manque */
 .footer {
   display: flex;
   flex-wrap: wrap;
@@ -181,6 +199,7 @@ body {
   color: var(--accent);
 }
 
+/* Boutons présentés comme des liens (réinitialiser, paramètres) */
 .link-button {
   padding: 0;
   border: 0;

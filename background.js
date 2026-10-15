@@ -1,33 +1,89 @@
-// Service worker : envoie les vrais clics sur le bouton « Ignorer » via chrome.debugger
-// et tient les statistiques (seul écrivain, pour que plusieurs onglets ne se marchent pas dessus).
+// =============================================================================
+// background.js — service worker de l'extension (Manifest V3)
+// =============================================================================
 //
-// Pourquoi chrome.debugger ? Le lecteur YouTube rejette les clics dont event.isTrusted
-// vaut false (voir docs/verification-selecteurs.md). Un content script ne peut produire
-// que ce type de clic ; Input.dispatchMouseEvent du protocole DevTools produit un clic réel.
+// Rôle :
+//   1. Envoyer les VRAIS clics sur le bouton « Ignorer » des publicités, via chrome.debugger.
+//   2. Tenir les statistiques (publicités ignorées pendant la session et au total).
+//
+// Un service worker MV3 n'a pas accès à la page : il ne voit ni le DOM ni le lecteur.
+// C'est le content script (content/*.js) qui détecte la publicité et calcule la position
+// du bouton ; il demande ensuite au service worker de cliquer à ces coordonnées.
+//
+// Pourquoi chrome.debugger ?
+//   Le lecteur YouTube rejette les clics dont event.isTrusted vaut false (voir
+//   docs/verification-selecteurs.md). Tout clic produit par un script de page ou par un
+//   content script (element.click(), dispatchEvent…) a isTrusted === false : il ne fait pas
+//   passer la publicité et déclenche même « onAbnormalityDetected » côté YouTube.
+//   La commande Input.dispatchMouseEvent du protocole DevTools, accessible aux extensions
+//   par chrome.debugger, produit au contraire un clic que le navigateur traite comme un
+//   clic réel de l'utilisateur (isTrusted === true).
 //
 // Le clic se fait en deux temps, à la demande du content script :
-//   1. « debugger-attach » : attache le débogueur. Chrome affiche alors son bandeau
-//      « … a commencé à déboguer ce navigateur », ce qui peut décaler la mise en page ;
-//   2. « debugger-click » : le content script a recalculé la position du bouton après
-//      ce décalage ; le clic est envoyé puis le débogueur détaché immédiatement.
-// Un délai de sécurité détache le débogueur si l'étape 2 n'arrive jamais.
+//   1. « debugger-attach » : attache le débogueur à l'onglet. Chrome affiche alors son
+//      bandeau « … a commencé à déboguer ce navigateur », ce qui peut décaler la page de
+//      quelques pixels vers le bas ;
+//   2. « debugger-click » : le content script a recalculé la position du bouton APRÈS ce
+//      décalage ; le clic est envoyé à ces coordonnées puis le débogueur est détaché aussitôt.
+//   Un délai de sécurité (ATTACH_TIMEOUT_MS) détache le débogueur si l'étape 2 n'arrive
+//   jamais (onglet fermé, publicité terminée entre-temps, erreur dans le content script…).
+//
+// Statistiques :
+//   Ce fichier est le SEUL à écrire les compteurs. Si chaque onglet écrivait lui-même,
+//   deux onglets qui ignorent une publicité au même moment pourraient lire la même valeur
+//   et écrire chacun « valeur + 1 » : un incrément serait perdu. Ici, les écritures passent
+//   par une file d'attente et s'exécutent l'une après l'autre.
+// =============================================================================
 
+// --- Constantes --------------------------------------------------------------
+
+/** Version du protocole DevTools demandée à chrome.debugger.attach (1.3 = version stable). */
 const DEBUGGER_PROTOCOL_VERSION = "1.3";
+
+/** Délai maximal (ms) pendant lequel le débogueur peut rester attaché sans recevoir de clic. */
 const ATTACH_TIMEOUT_MS = 3000;
+
+/** Seule origine autorisée à demander un clic (l'extension ne couvre que www.youtube.com). */
 const ALLOWED_ORIGIN = "https://www.youtube.com/";
 
-// Statistiques : la session est effacée par Chrome à sa fermeture, le total est conservé.
+// Clés des compteurs dans chrome.storage :
+//   - sessionSkipped est rangé dans chrome.storage.session, que Chrome vide à sa fermeture ;
+//   - totalSkipped est rangé dans chrome.storage.local, conservé entre les redémarrages.
 const SESSION_COUNT_KEY = "sessionSkipped";
 const TOTAL_COUNT_KEY = "totalSkipped";
 
-/** Messages acceptés et expéditeur requis pour chacun. */
+// Liste blanche des messages acceptés, classés selon l'expéditeur qui a le droit de les
+// envoyer. Tout autre type de message est ignoré par l'écouteur plus bas.
+/** Messages envoyés par le content script d'un onglet YouTube. */
 const CONTENT_MESSAGES = new Set(["debugger-attach", "debugger-click", "debugger-detach", "ad-skipped"]);
+/** Messages envoyés par une page de l'extension (popup). */
 const EXTENSION_PAGE_MESSAGES = new Set(["stats-reset"]);
 
-/** Onglets auxquels l'extension est attachée : tabId -> minuteur de détachement automatique. */
+// --- État en mémoire ---------------------------------------------------------
+
+/**
+ * Onglets auxquels l'extension est actuellement attachée comme débogueur.
+ * Clé : identifiant de l'onglet (tabId). Valeur : minuteur de détachement automatique.
+ *
+ * Remarque : un service worker MV3 peut être arrêté par Chrome quand il est inactif ;
+ * cette Map est alors perdue. Le risque est faible : entre l'attachement et le détachement,
+ * il ne s'écoule qu'une fraction de seconde, pendant laquelle le worker traite des messages.
+ */
 const attachedTabs = new Map();
 
-/** Vrai si le message vient de notre content script, dans le cadre principal d'un onglet YouTube. */
+// --- Contrôle des expéditeurs ------------------------------------------------
+
+/**
+ * Vrai si le message vient de NOTRE content script, dans le cadre principal (frameId 0)
+ * d'un onglet www.youtube.com.
+ *
+ * Ce contrôle empêche :
+ *   - une autre extension de nous faire cliquer (sender.id différent) ;
+ *   - un cadre intégré (iframe) de la page de demander un clic (frameId ≠ 0) ;
+ *   - un domaine trompeur comme « www.youtube.com.exemple.test » (startsWith sur
+ *     l'origine complète, barre oblique finale comprise).
+ * @param {chrome.runtime.MessageSender} sender expéditeur fourni par Chrome
+ */
 function isTrustedSender(sender) {
   return Boolean(
     sender &&
@@ -40,7 +96,11 @@ function isTrustedSender(sender) {
   );
 }
 
-/** Vrai si le message vient d'une page de l'extension (popup, aide). */
+/**
+ * Vrai si le message vient d'une page de l'extension (popup, options, aide).
+ * Ces pages ont une adresse chrome-extension://<id-de-l'extension>/…
+ * @param {chrome.runtime.MessageSender} sender
+ */
 function isExtensionPage(sender) {
   return Boolean(
     sender &&
@@ -50,27 +110,45 @@ function isExtensionPage(sender) {
   );
 }
 
+/**
+ * Vrai si cet expéditeur a le droit d'envoyer ce type de message.
+ * Une page YouTube ne peut pas remettre les statistiques à zéro, et la popup ne peut pas
+ * demander de clic.
+ */
 function isAuthorized(message, sender) {
   if (CONTENT_MESSAGES.has(message.type)) return isTrustedSender(sender);
   if (EXTENSION_PAGE_MESSAGES.has(message.type)) return isExtensionPage(sender);
   return false;
 }
 
-// Les écritures sont mises en file : deux incréments simultanés ne doivent pas se perdre.
+// --- Statistiques ------------------------------------------------------------
+
+// File d'attente des écritures : chaque mise à jour attend la fin de la précédente.
+// statsQueue est toujours une promesse résolue (jamais rejetée), pour qu'une écriture
+// en échec ne bloque pas les suivantes.
 let statsQueue = Promise.resolve();
 
+/**
+ * Ajoute une mise à jour des compteurs à la file d'attente.
+ * @param {() => Promise<unknown>} update fonction qui lit puis écrit les compteurs
+ * @returns {Promise<unknown>} promesse de CETTE mise à jour (rejetée si elle échoue)
+ */
 function enqueueStatsUpdate(update) {
   const run = statsQueue.then(update);
-  statsQueue = run.catch(() => {});
+  statsQueue = run.catch(() => {}); // la file continue même si cette mise à jour échoue
   return run;
 }
 
+/** Ajoute 1 au compteur de session et au compteur total. */
 function recordSkippedAd() {
   return enqueueStatsUpdate(async () => {
+    // Lecture des deux compteurs en parallèle ; 0 si la clé n'existe pas encore.
     const [session, local] = await Promise.all([
       chrome.storage.session.get({ [SESSION_COUNT_KEY]: 0 }),
       chrome.storage.local.get({ [TOTAL_COUNT_KEY]: 0 }),
     ]);
+    // Écriture des deux nouvelles valeurs. chrome.storage.onChanged prévient ensuite la
+    // popup, qui met son affichage à jour si elle est ouverte.
     await Promise.all([
       chrome.storage.session.set({ [SESSION_COUNT_KEY]: session[SESSION_COUNT_KEY] + 1 }),
       chrome.storage.local.set({ [TOTAL_COUNT_KEY]: local[TOTAL_COUNT_KEY] + 1 }),
@@ -78,6 +156,7 @@ function recordSkippedAd() {
   });
 }
 
+/** Remet les deux compteurs à zéro (bouton « Réinitialiser les statistiques » de la popup). */
 function resetStats() {
   return enqueueStatsUpdate(() =>
     Promise.all([
@@ -87,10 +166,22 @@ function resetStats() {
   );
 }
 
+// --- Débogueur et clic -------------------------------------------------------
+
+/**
+ * Vrai si (x, y) est un point utilisable : deux nombres finis et positifs.
+ * Les coordonnées viennent du content script ; on ne leur fait pas confiance aveuglément.
+ */
 function isValidPoint(x, y) {
   return Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0;
 }
 
+/**
+ * Attache le débogueur à l'onglet et programme son détachement automatique.
+ * Ne fait rien si l'extension est déjà attachée à cet onglet.
+ * Lève une erreur si Chrome refuse (par exemple : une autre extension est déjà attachée).
+ * @param {number} tabId
+ */
 async function attachDebugger(tabId) {
   if (attachedTabs.has(tabId)) return;
   await chrome.debugger.attach({ tabId }, DEBUGGER_PROTOCOL_VERSION);
@@ -100,19 +191,35 @@ async function attachDebugger(tabId) {
   );
 }
 
+/**
+ * Détache le débogueur de l'onglet, s'il est attaché, et annule le minuteur de sécurité.
+ * Le bandeau « … a commencé à déboguer ce navigateur » disparaît alors.
+ * @param {number} tabId
+ */
 async function detachDebugger(tabId) {
   const timer = attachedTabs.get(tabId);
-  if (timer === undefined) return;
+  if (timer === undefined) return; // pas attaché : rien à faire
   clearTimeout(timer);
   attachedTabs.delete(tabId);
   try {
     await chrome.debugger.detach({ tabId });
   } catch {
-    // Déjà détaché (onglet fermé, bandeau « Annuler » cliqué…) : rien à faire.
+    // Déjà détaché (onglet fermé, bouton « Annuler » du bandeau cliqué…) : rien à faire.
   }
 }
 
-/** Envoie un clic gauche réel aux coordonnées données (pixels CSS, relatives à la fenêtre). */
+/**
+ * Envoie un clic gauche réel aux coordonnées données, puis détache le débogueur.
+ *
+ * Un clic se compose de deux événements : appui (mousePressed) puis relâchement
+ * (mouseReleased) au même endroit. Les coordonnées sont en pixels CSS, relatives au coin
+ * supérieur gauche de la zone d'affichage de la page (comme getBoundingClientRect).
+ *
+ * Le débogueur est détaché dans tous les cas (bloc finally), même si une commande échoue.
+ * @param {number} tabId
+ * @param {number} x
+ * @param {number} y
+ */
 async function dispatchTrustedClick(tabId, x, y) {
   if (!attachedTabs.has(tabId)) throw new Error("débogueur non attaché");
   try {
@@ -124,7 +231,18 @@ async function dispatchTrustedClick(tabId, x, y) {
   }
 }
 
+// --- Traitement des messages -------------------------------------------------
+
+/**
+ * Exécute un message déjà autorisé et renvoie la réponse à transmettre à l'expéditeur.
+ * Exportée pour les tests (qui l'appellent directement, sans passer par chrome.runtime).
+ * @param {{type: string, x?: number, y?: number}} message
+ * @param {chrome.runtime.MessageSender} sender
+ * @returns {Promise<{ok: boolean, error?: string} | undefined>}
+ */
 async function handleMessage(message, sender) {
+  // Les pages de l'extension (popup) n'ont pas d'onglet : tabId vaut alors undefined,
+  // ce qui ne pose pas de problème car elles n'envoient pas de message « debugger-* ».
   const tabId = sender.tab && sender.tab.id;
   switch (message.type) {
     case "debugger-attach":
@@ -132,15 +250,17 @@ async function handleMessage(message, sender) {
       return { ok: true };
     case "debugger-click":
       if (!isValidPoint(message.x, message.y)) {
-        await detachDebugger(tabId);
+        await detachDebugger(tabId); // ne pas laisser le débogueur attaché inutilement
         return { ok: false, error: "coordonnées invalides" };
       }
       await dispatchTrustedClick(tabId, message.x, message.y);
       return { ok: true };
     case "debugger-detach":
+      // Le content script renonce au clic (publicité terminée, bouton recouvert…).
       await detachDebugger(tabId);
       return { ok: true };
     case "ad-skipped":
+      // Le content script a constaté que la publicité a bien été quittée après le clic.
       await recordSkippedAd();
       return { ok: true };
     case "stats-reset":
@@ -151,20 +271,29 @@ async function handleMessage(message, sender) {
   }
 }
 
+// Point d'entrée des messages envoyés par chrome.runtime.sendMessage (content script, popup).
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Messages qui ne nous concernent pas : on ne répond pas (return false).
   if (!message || typeof message.type !== "string") return false;
   if (!CONTENT_MESSAGES.has(message.type) && !EXTENSION_PAGE_MESSAGES.has(message.type)) return false;
+
   if (!isAuthorized(message, sender)) {
     sendResponse({ ok: false, error: "expéditeur non autorisé" });
     return false;
   }
+
+  // Les erreurs (débogueur déjà utilisé, onglet fermé…) sont renvoyées à l'expéditeur
+  // sous forme de réponse { ok: false, error } plutôt que de faire planter le worker.
   handleMessage(message, sender).then(sendResponse, (error) =>
     sendResponse({ ok: false, error: String((error && error.message) || error) })
   );
-  return true; // réponse asynchrone
+  // « true » indique à Chrome que sendResponse sera appelée plus tard (réponse asynchrone) ;
+  // sans cela, le canal de réponse serait fermé dès la fin de cette fonction.
+  return true;
 });
 
-// Détachement par Chrome (onglet fermé, bouton « Annuler » du bandeau) : oublier l'onglet.
+// Chrome détache lui-même le débogueur quand l'onglet est fermé ou que l'utilisateur
+// clique sur « Annuler » dans le bandeau : on oublie alors l'onglet et son minuteur.
 chrome.debugger.onDetach.addListener((source) => {
   const timer = attachedTabs.get(source.tabId);
   if (timer !== undefined) {
@@ -173,9 +302,10 @@ chrome.debugger.onDetach.addListener((source) => {
   }
 });
 
+// Onglet fermé : détacher par précaution (sans effet si l'extension n'y était pas attachée).
 chrome.tabs.onRemoved.addListener((tabId) => detachDebugger(tabId));
 
-// Export pour les tests Node (absent dans Chrome).
+// Export pour les tests Node. Dans Chrome, « module » n'existe pas : ce bloc est ignoré.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     isTrustedSender,

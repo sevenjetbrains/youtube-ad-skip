@@ -1,4 +1,13 @@
 <!doctype html>
+<!--
+  popup/popup.html — fenêtre affichée au clic sur l'icône de l'extension
+  (déclarée dans « action.default_popup » du manifest).
+
+  Structure : en-tête (logo + nom), interrupteur général, indicateur d'état de l'onglet
+  actif, compteurs, liens d'action. Le comportement est dans popup.js, l'apparence dans
+  popup.css. Les règles de sécurité des extensions (CSP) interdisent le JavaScript écrit
+  directement dans le HTML : tout le code est dans des fichiers .js séparés.
+-->
 <html lang="fr">
 <head>
   <meta charset="utf-8">
@@ -7,11 +16,17 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
+  <!-- En-tête : logo et nom de l'extension. alt="" car l'image est décorative (le nom suit). -->
   <header class="header">
     <img src="../assets/icons/icon-48.png" alt="" width="32" height="32">
     <h1>YouTube Ad Skip</h1>
   </header>
 
+  <!--
+    Interrupteur général. C'est une vraie case à cocher (accessible au clavier et aux
+    lecteurs d'écran, role="switch"), masquée visuellement et remplacée par .switch.
+    Tout le <label> est cliquable.
+  -->
   <label class="toggle">
     <span class="toggle-text">
       <span class="toggle-title">Ignorer les publicités</span>
@@ -21,11 +36,16 @@
     <span class="switch" aria-hidden="true"></span>
   </label>
 
+  <!--
+    Indicateur d'état de l'onglet actif. data-tone (ok / warn / muted) choisit la couleur
+    de la pastille ; aria-live annonce les changements aux lecteurs d'écran.
+  -->
   <p class="status" id="status" data-tone="muted" aria-live="polite">
     <span class="dot" aria-hidden="true"></span>
     <span id="status-text">Vérification…</span>
   </p>
 
+  <!-- Compteurs de publicités réellement ignorées, mis à jour en direct par popup.js. -->
   <section class="stats" aria-label="Publicités ignorées">
     <div class="stat">
       <span class="stat-value" id="session-count">0</span>
@@ -37,12 +57,14 @@
     </div>
   </section>
 
+  <!-- Actions. L'aide s'ouvre dans un nouvel onglet (target="_blank"). -->
   <footer class="footer">
     <button type="button" class="link-button" id="reset">Réinitialiser les statistiques</button>
     <button type="button" class="link-button" id="open-options">Paramètres</button>
     <a href="../help/help.html" target="_blank" rel="noopener">Aide et informations</a>
   </footer>
 
+  <!-- settings.js d'abord : popup.js utilise l'objet YtAdSkipSettings qu'il définit. -->
   <script src="../common/settings.js"></script>
   <script src="popup.js"></script>
 </body>

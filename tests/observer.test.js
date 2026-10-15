@@ -1,3 +1,18 @@
+// =============================================================================
+// Tests de content/observer.js (partie surveillance : createAdWatcher)
+// =============================================================================
+//
+// Vérifie que la surveillance réagit aux bons changements (classe du lecteur, apparition
+// du bouton, navigation interne, insertion du lecteur), qu'elle regroupe les mutations
+// rapprochées, et qu'elle libère TOUS ses observateurs et minuteurs quand ils ne servent
+// plus (fin de publicité, arrêt). debugState expose l'état interne pour ces vérifications.
+// Les MutationObserver de jsdom sont asynchrones : tick() laisse le temps de les traiter.
+//
+// Lancement : npm test (tous les fichiers) ou node --test tests/observer.test.js (ce fichier seul).
+// Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
+// (vérifications : equal compare avec ===, deepEqual compare le contenu des objets).
+// =============================================================================
+
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createYouTubeDom } = require("./helpers/youtube-dom");
@@ -5,8 +20,10 @@ require("../content/detector.js");
 require("../content/ad-skipper.js");
 const ns = require("../content/observer.js");
 
+/** Attend quelques millisecondes : le temps que jsdom traite les mutations et les vérifications programmées. */
 const tick = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Crée un faux lecteur et une surveillance qui enregistre chaque état reçu dans « states ». */
 function setup(opts) {
   const dom = createYouTubeDom(opts);
   const doc = dom.window.document;
