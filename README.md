@@ -2,7 +2,7 @@
 
 Extension Chrome (Manifest V3) qui clique automatiquement sur le bouton « Ignorer » des publicités YouTube.
 
-> État : **étape 3 — clic automatique**. La popup, les statistiques et les réglages arrivent aux étapes 4 et 5.
+> État : **étape 4 — fenêtre et statistiques**. La page d'options (clic automatique, fonctions expérimentales) arrive à l'étape 5.
 
 ## Fonctionnement
 
@@ -10,6 +10,18 @@ Extension Chrome (Manifest V3) qui clique automatiquement sur le bouton « Ignor
 2. `content/detector.js` vérifie que le bouton « Ignorer » est un vrai bouton de publicité, situé dans le lecteur, visible et activé.
 3. `content/ad-skipper.js` demande au service worker un **vrai clic** au centre du bouton, puis vérifie après 1,5 s que la publicité a bien été quittée. Il fait au plus 3 tentatives par publicité, espacées d'au moins 1 s.
 4. `background.js` s'attache à l'onglet avec `chrome.debugger`, envoie l'appui et le relâchement de la souris, puis se détache aussitôt.
+
+## Fenêtre de l'extension
+
+Un clic sur l'icône ouvre la fenêtre (`popup/`) :
+
+- **interrupteur** « Ignorer les publicités » : arrête ou relance immédiatement la surveillance dans tous les onglets YouTube, même pendant une lecture ;
+- **indicateur d'état** de l'onglet actif : en pause, inactif (page non YouTube ou onglet à recharger), en attente d'une vidéo, aucune publicité, publicité en cours ;
+- **compteurs** de publicités réellement ignorées : *cette session* (effacé à la fermeture de Chrome, `chrome.storage.session`) et *au total* (conservé, `chrome.storage.local`) ;
+- **Réinitialiser les statistiques** : remet les deux compteurs à zéro ;
+- **Aide et informations** : ouvre `help/help.html` (fonctionnement, bandeau du débogueur, limites, confidentialité).
+
+Les compteurs sont écrits uniquement par `background.js`, en file d'attente, pour que deux onglets ne perdent pas d'incrément. La popup obtient l'état de l'onglet en interrogeant son content script : aucune permission `tabs` n'est nécessaire.
 
 ### Pourquoi `chrome.debugger` ?
 
@@ -40,12 +52,12 @@ npm install
 npm test
 ```
 
-Les tests utilisent `node --test` et jsdom. Ils reproduisent la structure du lecteur relevée dans le code de YouTube et utilisent une fausse API `chrome`.
+Les tests utilisent `node --test` et jsdom. Ils reproduisent la structure du lecteur relevée dans le code de YouTube et utilisent une fausse API `chrome` (dont `chrome.storage`, dans `tests/helpers/fake-storage.js`).
 
 ## Périmètre
 
 - Site couvert : `https://www.youtube.com/*` uniquement.
-- Permissions : `debugger`.
+- Permissions : `debugger` (vrai clic) et `storage` (réglage et compteurs, stockés localement).
 
 ## Outils
 

@@ -11,6 +11,37 @@
     <img src="../assets/icons/icon-48.png" alt="" width="32" height="32">
     <h1>YouTube Ad Skip</h1>
   </header>
-  <p class="placeholder">Squelette — les réglages arrivent à l'étape 4.</p>
+
+  <label class="toggle">
+    <span class="toggle-text">
+      <span class="toggle-title">Ignorer les publicités</span>
+      <span class="toggle-hint">Clic automatique sur « Ignorer »</span>
+    </span>
+    <input type="checkbox" id="enabled" role="switch">
+    <span class="switch" aria-hidden="true"></span>
+  </label>
+
+  <p class="status" id="status" data-tone="muted" aria-live="polite">
+    <span class="dot" aria-hidden="true"></span>
+    <span id="status-text">Vérification…</span>
+  </p>
+
+  <section class="stats" aria-label="Publicités ignorées">
+    <div class="stat">
+      <span class="stat-value" id="session-count">0</span>
+      <span class="stat-label">cette session</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value" id="total-count">0</span>
+      <span class="stat-label">au total</span>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <button type="button" class="link-button" id="reset">Réinitialiser les statistiques</button>
+    <a href="../help/help.html" target="_blank" rel="noopener">Aide et informations</a>
+  </footer>
+
+  <script src="popup.js"></script>
 </body>
 </html>

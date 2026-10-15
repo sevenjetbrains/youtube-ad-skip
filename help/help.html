@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aide — YouTube Ad Skip</title>
+  <link rel="stylesheet" href="help.css">
+</head>
+<body>
+  <main>
+    <header class="header">
+      <img src="../assets/icons/icon-48.png" alt="" width="40" height="40">
+      <h1>YouTube Ad Skip — aide</h1>
+    </header>
+
+    <section>
+      <h2>Ce que fait l'extension</h2>
+      <p>Sur <strong>www.youtube.com</strong>, l'extension surveille le lecteur vidéo. Dès que le bouton « Ignorer » d'une publicité est affiché et utilisable, elle clique dessus, puis vérifie que la publicité a bien été quittée. Seules les publicités réellement quittées sont comptées.</p>
+    </section>
+
+    <section>
+      <h2>Le bandeau « a commencé à déboguer ce navigateur »</h2>
+      <p>YouTube ignore les clics simulés par un script. Pour produire un vrai clic, l'extension utilise l'API <code>chrome.debugger</code> de Chrome. À chaque clic, Chrome affiche donc brièvement ce bandeau : c'est normal, l'extension se détache aussitôt.</p>
+      <p>Pour un usage personnel, le bandeau disparaît si Chrome est lancé avec l'option <code>--silent-debugger-extension-api</code>.</p>
+    </section>
+
+    <section>
+      <h2>Limites</h2>
+      <ul>
+        <li>Les publicités <strong>non ignorables</strong> (sans bouton « Ignorer ») sont lues normalement.</li>
+        <li>L'extension ne bloque pas les publicités avant leur affichage.</li>
+        <li>Seul <code>www.youtube.com</code> est couvert : pas m.youtube.com, YouTube Music ni les vidéos intégrées à d'autres sites.</li>
+        <li>Si une autre extension est déjà attachée à l'onglet comme débogueur, le clic échoue : la publicité n'est alors pas comptée.</li>
+        <li>YouTube modifie régulièrement son interface ; une mise à jour de l'extension peut être nécessaire.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Statistiques</h2>
+      <p>« Cette session » repart de zéro à chaque redémarrage de Chrome. « Au total » est conservé. Le lien « Réinitialiser les statistiques » de la fenêtre remet les deux compteurs à zéro.</p>
+    </section>
+
+    <section>
+      <h2>Confidentialité</h2>
+      <p>L'extension ne collecte aucune donnée personnelle et n'envoie rien à un serveur. Les réglages et les compteurs restent dans votre navigateur.</p>
+    </section>
+
+    <section>
+      <h2>En cas de problème</h2>
+      <ul>
+        <li>L'indicateur affiche « Inactif sur cet onglet » : rechargez la page YouTube (nécessaire après l'installation ou la mise à jour de l'extension).</li>
+        <li>Vérifiez que l'interrupteur de la fenêtre est activé.</li>
+        <li>Désactivez les autres extensions qui utilisent le débogueur sur cet onglet.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

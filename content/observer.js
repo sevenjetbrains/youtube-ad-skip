@@ -131,21 +131,79 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
     };
   }
 
-  /** Démarrage dans Chrome. */
-  function main() {
+  const ENABLED_KEY = "enabled"; // réglage global, partagé avec la popup (chrome.storage.local)
+
+  /**
+   * Relie la surveillance aux réglages et à la popup.
+   *   - démarre ou arrête la surveillance selon le réglage « enabled » (activé par défaut),
+   *     y compris en pleine lecture lorsque l'utilisateur bascule l'interrupteur ;
+   *   - signale chaque publicité réellement ignorée au service worker, qui tient les compteurs ;
+   *   - répond à la popup qui demande l'état de l'onglet (« get-status »).
+   * @param {{doc: Document, chromeApi: typeof chrome}} opts
+   */
+  function startContentScript({ doc, chromeApi }) {
+    let enabled = false;
+
+    function notify(message) {
+      // Échoue si l'extension a été rechargée sans recharger l'onglet : sans conséquence.
+      return Promise.resolve()
+        .then(() => chromeApi.runtime.sendMessage(message))
+        .catch((error) => console.warn("[YouTube Ad Skip] message non transmis :", error));
+    }
+
     const skipper = new ns.AdSkipper({
-      doc: document,
-      onSkipped: () => console.info("[YouTube Ad Skip] publicité ignorée"),
+      doc,
+      bridge: { send: (message) => chromeApi.runtime.sendMessage(message) },
+      onSkipped: () => {
+        console.info("[YouTube Ad Skip] publicité ignorée");
+        notify({ type: "ad-skipped" });
+      },
     });
-    const watcher = createAdWatcher({ doc: document, onCheck: (info) => skipper.handle(info) });
-    watcher.start();
-    ns.watcher = watcher;
+    const watcher = createAdWatcher({ doc, onCheck: (info) => enabled && skipper.handle(info) });
+
+    function setEnabled(next) {
+      if (next === enabled) return;
+      enabled = next;
+      if (enabled) {
+        watcher.start();
+      } else {
+        watcher.stop();
+        skipper.reset();
+      }
+    }
+
+    chromeApi.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && changes[ENABLED_KEY]) setEnabled(changes[ENABLED_KEY].newValue !== false);
+    });
+    chromeApi.storage.local.get({ [ENABLED_KEY]: true }).then(
+      (values) => setEnabled(values[ENABLED_KEY] !== false),
+      (error) => {
+        console.warn("[YouTube Ad Skip] réglages illisibles, activation par défaut :", error);
+        setEnabled(true);
+      }
+    );
+
+    chromeApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (!message || message.type !== "get-status" || sender.id !== chromeApi.runtime.id) return false;
+      let state = "unknown";
+      try {
+        state = ns.getAdState(doc).state;
+      } catch (error) {
+        console.warn("[YouTube Ad Skip] erreur de détection :", error);
+      }
+      sendResponse({ enabled, state });
+      return false;
+    });
+
+    return { watcher, skipper, setEnabled, get enabled() { return enabled; } };
   }
 
   ns.createAdWatcher = createAdWatcher;
+  ns.startContentScript = startContentScript;
+  ns.ENABLED_KEY = ENABLED_KEY;
 
   const inExtension = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id;
-  if (inExtension) main();
+  if (inExtension) ns.contentScript = startContentScript({ doc: document, chromeApi: chrome });
 })(YtAdSkip);
 
 if (typeof module !== "undefined" && module.exports) module.exports = YtAdSkip;

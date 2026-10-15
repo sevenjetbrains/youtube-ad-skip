@@ -3,7 +3,7 @@
   "name": "YouTube Ad Skip",
   "version": "0.1.0",
   "description": "Clique automatiquement sur le bouton « Ignorer » des publicités YouTube dès qu'il est disponible.",
-  "permissions": ["debugger"],
+  "permissions": ["debugger", "storage"],
   "background": {
     "service_worker": "background.js"
   },
