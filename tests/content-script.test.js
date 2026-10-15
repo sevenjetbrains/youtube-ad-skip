@@ -37,6 +37,7 @@ function setup({ local = {}, ad = false, storage = createFakeStorage({ local }) 
     storage,
   };
   const cs = ns.startContentScript({ doc, chromeApi });
+  cs.chromeApi = chromeApi; // accès pour les tests
   /** Simule la popup qui demande l'état de l'onglet. */
   function askStatus(sender = { id: "ext-id" }) {
     let reply;
@@ -145,5 +146,26 @@ test("publicité ignorée signalée au service worker", async () => {
   ctx.cs.skipper.onSkipped();
   await waitFor(() => ctx.sent.length > 0);
   assert.deepEqual(ctx.sent, [{ type: "ad-skipped" }]);
+  ctx.stop();
+});
+
+test("extension rechargée sans recharger l'onglet : arrêt propre et vidéo rétablie", async () => {
+  const ctx = setup({ ad: true, local: { experimental: true } });
+  await waitFor(() => ctx.video.playbackRate === ns.AD_PLAYBACK_RATE);
+
+  ctx.cs.chromeApi.runtime.id = undefined; // ce que fait Chrome quand le contexte est invalidé
+  await waitFor(() => !ctx.cs.enabled); // détecté à la vérification suivante (≤ 500 ms)
+  assert.equal(ctx.video.playbackRate, 1);
+  assert.equal(ctx.video.muted, false);
+  assert.equal(ctx.cs.watcher.debugState.adObserver, false);
+  assert.equal(ctx.cs.watcher.debugState.polling, false);
+  assert.deepEqual(ctx.sent, [], "aucun clic tenté");
+});
+
+test("lecteur sans conteneur .video-ads (interface modifiée, scénario 9) : surveillance sans erreur", async () => {
+  const ctx = setup({ ad: true });
+  ctx.doc.querySelector(".video-ads").remove();
+  await waitFor(() => ctx.cs.watcher.debugState.adObserver); // repli sur le lecteur entier
+  assert.deepEqual(ctx.askStatus(), { enabled: true, state: "ad-waiting" });
   ctx.stop();
 });

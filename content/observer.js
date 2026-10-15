@@ -162,12 +162,26 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
     });
     const accelerator = new ns.AdAccelerator();
 
+    /**
+     * Vrai si l'extension a été rechargée, mise à jour ou désinstallée depuis l'injection de ce
+     * script : Chrome ne le retire pas de l'onglet, mais il n'a plus accès à l'extension
+     * (chrome.runtime.id devient undefined). Il ne doit alors plus agir sur le lecteur.
+     */
+    const isOrphaned = () => !chromeApi.runtime || !chromeApi.runtime.id;
+
     function onCheck(info) {
       if (!isActive()) return;
+      if (isOrphaned()) return shutDown();
       if (settings.experimental) accelerator.handle(info);
       if (settings.autoSkip) skipper.handle(info);
     }
     const watcher = createAdWatcher({ doc, onCheck });
+
+    /** Arrêt définitif : vidéo rétablie, surveillance libérée. L'onglet devra être rechargé. */
+    function shutDown() {
+      console.info("[YouTube Ad Skip] extension rechargée : rechargez l'onglet pour la réactiver");
+      applySettings({ enabled: false });
+    }
 
     function applySettings(next) {
       const wasActive = isActive();
@@ -205,6 +219,7 @@ var YtAdSkip = globalThis.YtAdSkip || (globalThis.YtAdSkip = {});
       skipper,
       accelerator,
       applySettings,
+      shutDown,
       get settings() {
         return settings;
       },
