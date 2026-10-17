@@ -1,0 +1,41 @@
+/*
+  content/ad-hider.css — masquage des publicités HORS du lecteur (filtres cosmétiques)
+
+  Équivalent des règles « ##… » de Brave Shields, EasyList et uBlock Origin pour YouTube.
+  Enregistrée par background.js (chrome.scripting) seulement si le réglage « hideAds » est
+  activé, au tout début du chargement de la page (document_start) : les publicités ne
+  s'affichent pas, même brièvement.
+
+  Chaque nom d'élément a été vérifié dans le code de l'application YouTube le
+  18 octobre 2026 (voir docs/verification-selecteurs.md). Seuls les éléments dont le nom
+  désigne sans ambiguïté une publicité (ad, promoted, pyv, merch) sont masqués : les
+  bannières d'annonce de YouTube (statement-banner, banner-promo) sont laissées visibles.
+
+  NE PAS masquer ici les éléments du lecteur (.video-ads, .ytp-ad-module, boutons
+  « Ignorer ») : le clic automatique (content/ad-skipper.js) en a besoin pour les
+  publicités qui n'auraient pas été bloquées en amont.
+*/
+
+/* Accueil : grande publicité en haut du fil, et publicités mêlées aux vidéos. */
+#masthead-ad,
+ytd-video-masthead-ad-v3-renderer,
+ytd-rich-item-renderer:has(> #content > ytd-ad-slot-renderer),
+ytd-ad-slot-renderer,
+ytd-in-feed-ad-layout-renderer,
+
+/* Résultats de recherche : vidéos sponsorisées. */
+ytd-search-pyv-renderer,
+ytd-promoted-video-renderer,
+ytd-promoted-sparkles-web-renderer,
+
+/* Page de la vidéo : encarts à droite du lecteur et sous la description. */
+#player-ads,
+ytd-player-legacy-desktop-watch-ads-renderer,
+ytd-companion-slot-renderer,
+ytd-action-companion-ad-renderer,
+ytd-display-ad-renderer,
+ytd-merch-shelf-renderer,
+ytd-ads-engagement-panel-content-renderer,
+ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"] {
+  display: none !important;
+}

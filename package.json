@@ -1,6 +1,6 @@
 {
   "name": "youtube-ad-skip",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Extension Chrome (Manifest V3) qui clique automatiquement sur le bouton « Ignorer » des publicités YouTube.",
   "scripts": {

@@ -22,12 +22,17 @@
 
     <section>
       <h2>Ce que fait l'extension</h2>
-      <p>Sur <strong>www.youtube.com</strong>, l'extension surveille le lecteur vidéo. Dès que le bouton « Ignorer » d'une publicité est affiché et utilisable, elle clique dessus, puis vérifie que la publicité a bien été quittée. Seules les publicités réellement quittées sont comptées.</p>
+      <p>Sur <strong>www.youtube.com</strong>, l'extension agit en trois temps :</p>
+      <ol>
+        <li><strong>Blocage</strong> : elle retire les publicités des données que YouTube envoie au lecteur, comme le navigateur Brave. La vidéo démarre directement, sans publicité.</li>
+        <li><strong>Masquage</strong> : elle cache les publicités de la page (accueil, résultats de recherche, colonne à côté de la vidéo).</li>
+        <li><strong>Repli</strong> : si une publicité passe quand même, elle clique sur « Ignorer » dès que le bouton est utilisable, puis vérifie que la publicité a bien été quittée. Seules ces publicités réellement quittées sont comptées dans les statistiques ; les publicités bloquées en amont ne le sont pas.</li>
+      </ol>
     </section>
 
     <section>
       <h2>Paramètres</h2>
-      <p>Le lien « Paramètres » de la fenêtre ouvre la page d'options. On y trouve l'interrupteur général, le clic automatique sur « Ignorer » et les fonctions expérimentales. Les réglages sont conservés après un redémarrage de Chrome.</p>
+      <p>Le lien « Paramètres » de la fenêtre ouvre la page d'options. On y trouve l'interrupteur général, le blocage, le masquage, le clic automatique sur « Ignorer » et les fonctions expérimentales. Les réglages sont conservés après un redémarrage de Chrome. Le blocage et le masquage s'appliquent au prochain chargement des pages YouTube.</p>
       <p><strong>Fonctions expérimentales</strong> (désactivées par défaut) : pendant une publicité, la lecture est accélérée (×8) et le son coupé, puis tout est rétabli à la fin de la publicité. YouTube peut voir ce changement de vitesse et y réagir : à utiliser en connaissance de cause.</p>
     </section>
 
@@ -41,7 +46,8 @@
       <h2>Limites</h2>
       <ul>
         <li>Les publicités <strong>non ignorables</strong> (sans bouton « Ignorer ») sont lues normalement, sauf si les fonctions expérimentales sont activées : elles sont alors accélérées, pas supprimées.</li>
-        <li>L'extension ne bloque pas les publicités avant leur affichage.</li>
+        <li>Le blocage ne fonctionne pas sur les publicités que YouTube insère directement dans le flux vidéo, côté serveur : le clic sur « Ignorer » prend alors le relais.</li>
+        <li>YouTube peut détecter le blocage et afficher un avertissement « les bloqueurs de publicités ne sont pas autorisés ». Dans ce cas, désactivez le blocage dans les paramètres et rechargez la page : le clic automatique reste actif.</li>
         <li>Seul <code>www.youtube.com</code> est couvert : pas m.youtube.com, YouTube Music ni les vidéos intégrées à d'autres sites.</li>
         <li>Si une autre extension est déjà attachée à l'onglet comme débogueur, le clic échoue : la publicité n'est alors pas comptée.</li>
         <li>YouTube modifie régulièrement son interface ; une mise à jour de l'extension peut être nécessaire.</li>
@@ -62,7 +68,8 @@
       <h2>En cas de problème</h2>
       <ul>
         <li>L'indicateur affiche « Inactif sur cet onglet » : rechargez la page YouTube (nécessaire après l'installation ou la mise à jour de l'extension).</li>
-        <li>Vérifiez que l'interrupteur de la fenêtre est activé, et le clic automatique dans les paramètres.</li>
+        <li>Vérifiez que l'interrupteur de la fenêtre est activé, ainsi que le blocage et le clic automatique dans les paramètres.</li>
+        <li>Une publicité s'affiche malgré le blocage : rechargez la page (le blocage n'agit qu'au chargement), puis signalez-le si cela se répète. YouTube a peut-être changé le format de ses données.</li>
         <li>Désactivez les autres extensions qui utilisent le débogueur sur cet onglet.</li>
       </ul>
     </section>

@@ -10,8 +10,8 @@
 // lire, ce qui évite de répéter ces informations dans chaque fichier.
 //
 // Stockage : chaque réglage est une clé de chrome.storage.local (« enabled »,
-// « autoSkip », « experimental »). Cette zone est conservée entre les redémarrages de
-// Chrome, ce qui répond à l'exigence de persistance des préférences.
+// « blockAds », « hideAds », « autoSkip », « experimental »). Cette zone est conservée
+// entre les redémarrages de Chrome, ce qui répond à l'exigence de persistance des préférences.
 //
 // Ce fichier n'écrit jamais : l'écriture est faite par la popup et la page d'options
 // (chrome.storage.local.set). Les autres contextes sont prévenus par chrome.storage.onChanged.
@@ -30,18 +30,20 @@ var YtAdSkipSettings =
      */
     const DEFAULT_SETTINGS = Object.freeze({
       enabled: true, // activation globale (interrupteur de la popup)
+      blockAds: true, // retrait des publicités des données du lecteur (content/ad-blocker.js)
+      hideAds: true, // masquage des publicités hors du lecteur (content/ad-hider.css)
       autoSkip: true, // clic automatique sur « Ignorer »
       experimental: false, // accélération des publicités non ignorables
     });
 
-    /** Liste des noms de réglages : ["enabled", "autoSkip", "experimental"]. */
+    /** Liste des noms de réglages : ["enabled", "blockAds", "hideAds", "autoSkip", "experimental"]. */
     const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS);
 
     /**
      * Complète et nettoie des réglages lus : toute valeur non booléenne (absente, corrompue,
      * d'un autre type) reprend sa valeur par défaut. Les clés inconnues sont ignorées.
      * @param {object | null | undefined} raw réglages bruts
-     * @returns {{enabled: boolean, autoSkip: boolean, experimental: boolean}}
+     * @returns {{enabled: boolean, blockAds: boolean, hideAds: boolean, autoSkip: boolean, experimental: boolean}}
      */
     function normalizeSettings(raw) {
       const settings = {};
@@ -79,9 +81,11 @@ var YtAdSkipSettings =
     }
 
     /**
-     * Vrai si la surveillance du lecteur a une utilité avec ces réglages : extension activée
+     * Vrai si la surveillance du lecteur (content scripts « isolés ») a une utilité avec ces réglages : extension activée
      * ET au moins une fonction (clic automatique ou expérimentale) choisie. Sinon, la
      * surveillance est complètement arrêtée pour ne consommer aucune ressource.
+     * Le blocage et le masquage n'en dépendent pas : ils sont enregistrés à part par
+     * background.js (voir pageScriptsFor).
      */
     function isActive(settings) {
       return settings.enabled && (settings.autoSkip || settings.experimental);

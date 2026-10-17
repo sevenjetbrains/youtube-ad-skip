@@ -38,7 +38,7 @@ const STATUS_REFRESH_MS = 1000;
  *   "ok" (vert) = actif et rien à faire, "warn" (orange) = publicité en cours,
  *   "muted" (gris) = en pause ou inactif.
  *
- * @param {{enabled: boolean, autoSkip: boolean, experimental: boolean}} settings
+ * @param {{enabled: boolean, blockAds: boolean, hideAds: boolean, autoSkip: boolean, experimental: boolean}} settings
  * @param {{enabled: boolean, state: string} | null} reply réponse du content script (null = aucune)
  * @returns {{tone: "ok" | "warn" | "muted", text: string}}
  */
@@ -46,7 +46,11 @@ function describeStatus(settings, reply) {
   // Les réglages passent d'abord : s'ils mettent l'extension en pause, l'onglet importe peu.
   if (!settings.enabled) return { tone: "muted", text: "En pause" };
   if (!settings.autoSkip && !settings.experimental) {
-    return { tone: "muted", text: "En pause — clic automatique désactivé dans les paramètres" };
+    // Le blocage et le masquage fonctionnent sans le content script surveillé ici.
+    if (settings.blockAds || settings.hideAds) {
+      return { tone: "ok", text: "Actif — blocage seul, clic automatique désactivé dans les paramètres" };
+    }
+    return { tone: "muted", text: "En pause — toutes les fonctions sont désactivées dans les paramètres" };
   }
   // Pas de réponse : page non YouTube, ou onglet ouvert avant l'installation ou le
   // rechargement de l'extension (son content script est absent ou arrêté).

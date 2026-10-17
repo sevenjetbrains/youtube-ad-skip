@@ -52,7 +52,8 @@ h2 {
 }
 
 p,
-ul {
+ul,
+ol {
   margin: 0 0 10px;
 }
 

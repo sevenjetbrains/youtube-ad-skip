@@ -6,7 +6,8 @@
 // son chargement pour enregistrer ses écouteurs). chrome.debugger y enregistre chaque
 // appel dans « calls », ce qui permet de vérifier l'ordre exact : attachement, appui,
 // relâchement, détachement. Les tests vérifient aussi le contrôle des expéditeurs, la file
-// d'attente des compteurs (aucun incrément perdu) et le détachement automatique.
+// d'attente des compteurs (aucun incrément perdu), le détachement automatique, et
+// l'enregistrement du blocage et du masquage selon les réglages (faux chrome.scripting).
 //
 // Lancement : npm test (tous les fichiers) ou node --test tests/background.test.js (ce fichier seul).
 // Outils : node:test (exécuteur de tests intégré à Node) et node:assert/strict
@@ -23,6 +24,9 @@ const { createFakeStorage } = require("./helpers/fake-storage");
 const calls = [];
 let attachError = null;
 const storage = createFakeStorage();
+// Scripts enregistrés par chrome.scripting, par identifiant. Comme Chrome, un identifiant
+// déjà enregistré provoque une erreur.
+const registered = new Map();
 globalThis.chrome = {
   runtime: {
     id: "ext-id",
@@ -31,6 +35,20 @@ globalThis.chrome = {
   },
   storage,
   tabs: { onRemoved: { addListener() {} } },
+  scripting: {
+    async getRegisteredContentScripts({ ids } = {}) {
+      return [...registered.values()].filter((script) => !ids || ids.includes(script.id));
+    },
+    async registerContentScripts(scripts) {
+      for (const script of scripts) {
+        if (registered.has(script.id)) throw new Error(`Duplicate script ID '${script.id}'`);
+        registered.set(script.id, script);
+      }
+    },
+    async unregisterContentScripts({ ids }) {
+      for (const id of ids) registered.delete(id);
+    },
+  },
   debugger: {
     onDetach: { addListener() {} },
     async attach(target, version) {
@@ -139,4 +157,43 @@ test("chaque message n'est accepté que de son expéditeur prévu", () => {
   assert.equal(bg.isAuthorized({ type: "stats-reset" }, youtubeSender), false, "une page web ne peut pas effacer les stats");
   assert.equal(bg.isAuthorized({ type: "stats-reset" }, { ...popupSender, id: "autre" }), false);
   assert.equal(bg.isAuthorized({ type: "debugger-attach" }, popupSender), false);
+});
+
+test("scripts à enregistrer selon les réglages", () => {
+  const all = bg.pageScriptsFor({});
+  assert.deepEqual(all.map((script) => script.id), bg.PAGE_SCRIPT_IDS, "par défaut : blocage et masquage");
+  const [blocker, hider] = all;
+  assert.deepEqual(blocker.js, ["content/ad-blocker.js"]);
+  assert.equal(blocker.world, "MAIN", "dans la page, pour remplacer fetch");
+  assert.equal(blocker.runAt, "document_start", "avant les scripts de YouTube");
+  assert.deepEqual(blocker.matches, ["https://www.youtube.com/*"]);
+  assert.deepEqual(hider.css, ["content/ad-hider.css"]);
+
+  assert.deepEqual(bg.pageScriptsFor({ blockAds: false }).map((script) => script.id), ["yt-ad-hider"]);
+  assert.deepEqual(bg.pageScriptsFor({ hideAds: false }).map((script) => script.id), ["yt-ad-blocker"]);
+  assert.deepEqual(bg.pageScriptsFor({ enabled: false }), [], "extension désactivée : rien");
+});
+
+test("synchronisation des scripts enregistrés avec les réglages", async () => {
+  const ids = () => [...registered.keys()].sort();
+  await bg.syncPageScripts();
+  assert.deepEqual(ids(), ["yt-ad-blocker", "yt-ad-hider"]);
+
+  await storage.local.set({ blockAds: false });
+  await bg.syncPageScripts();
+  assert.deepEqual(ids(), ["yt-ad-hider"]);
+
+  await storage.local.set({ enabled: false });
+  await bg.syncPageScripts();
+  assert.deepEqual(ids(), [], "extension désactivée : tout est retiré");
+
+  await storage.local.set({ enabled: true, blockAds: true });
+  await bg.syncPageScripts();
+  assert.deepEqual(ids(), ["yt-ad-blocker", "yt-ad-hider"]);
+});
+
+test("synchronisations simultanées : aucun enregistrement en double", async () => {
+  registered.clear();
+  await Promise.all([bg.syncPageScripts(), bg.syncPageScripts(), bg.syncPageScripts()]);
+  assert.deepEqual([...registered.keys()].sort(), ["yt-ad-blocker", "yt-ad-hider"]);
 });

@@ -5,6 +5,7 @@
 // Rôle :
 //   1. Envoyer les VRAIS clics sur le bouton « Ignorer » des publicités, via chrome.debugger.
 //   2. Tenir les statistiques (publicités ignorées pendant la session et au total).
+//   3. Enregistrer le blocage et le masquage des publicités selon les réglages.
 //
 // Un service worker MV3 n'a pas accès à la page : il ne voit ni le DOM ni le lecteur.
 // C'est le content script (content/*.js) qui détecte la publicité et calcule la position
@@ -28,12 +29,29 @@
 //   Un délai de sécurité (ATTACH_TIMEOUT_MS) détache le débogueur si l'étape 2 n'arrive
 //   jamais (onglet fermé, publicité terminée entre-temps, erreur dans le content script…).
 //
+// Blocage et masquage des publicités (réglages « blockAds » et « hideAds ») :
+//   content/ad-blocker.js doit s'exécuter dans la page elle-même (monde MAIN) et avant les
+//   scripts de YouTube (document_start). Dans ce monde, chrome.storage n'est pas accessible :
+//   le script ne peut pas lire ses réglages. C'est donc ce fichier qui l'enregistre auprès de
+//   Chrome (chrome.scripting.registerContentScripts) quand le réglage est activé, et le
+//   retire sinon. Même chose pour content/ad-hider.css. Un changement de réglage prend
+//   effet au prochain chargement des pages YouTube.
+//
 // Statistiques :
 //   Ce fichier est le SEUL à écrire les compteurs. Si chaque onglet écrivait lui-même,
 //   deux onglets qui ignorent une publicité au même moment pourraient lire la même valeur
 //   et écrire chacun « valeur + 1 » : un incrément serait perdu. Ici, les écritures passent
 //   par une file d'attente et s'exécutent l'une après l'autre.
 // =============================================================================
+
+// --- Réglages ----------------------------------------------------------------
+
+// Module common/settings.js. Dans Chrome, importScripts le charge dans le service worker
+// (qui n'est pas un module ES) ; dans les tests Node, require le fournit.
+const Settings =
+  typeof importScripts === "function"
+    ? (importScripts("common/settings.js"), globalThis.YtAdSkipSettings)
+    : require("./common/settings.js");
 
 // --- Constantes --------------------------------------------------------------
 
@@ -231,6 +249,74 @@ async function dispatchTrustedClick(tabId, x, y) {
   }
 }
 
+// --- Blocage et masquage (scripts enregistrés) -------------------------------
+
+/** Pages concernées : les mêmes que les content scripts du manifest. */
+const YOUTUBE_MATCHES = ["https://www.youtube.com/*"];
+
+/** Identifiants des scripts que cette extension enregistre auprès de Chrome. */
+const BLOCKER_SCRIPT_ID = "yt-ad-blocker";
+const HIDER_SCRIPT_ID = "yt-ad-hider";
+const PAGE_SCRIPT_IDS = [BLOCKER_SCRIPT_ID, HIDER_SCRIPT_ID];
+
+/**
+ * Scripts à enregistrer pour ces réglages (aucun si l'extension est désactivée).
+ * @param {object} settings réglages (complétés par les valeurs par défaut si besoin)
+ * @returns {chrome.scripting.RegisteredContentScript[]}
+ */
+function pageScriptsFor(settings) {
+  const { enabled, blockAds, hideAds } = Settings.normalizeSettings(settings);
+  const scripts = [];
+  if (!enabled) return scripts;
+  if (blockAds) {
+    scripts.push({
+      id: BLOCKER_SCRIPT_ID,
+      js: ["content/ad-blocker.js"],
+      matches: YOUTUBE_MATCHES,
+      runAt: "document_start", // avant les scripts de YouTube
+      world: "MAIN", // dans la page : doit remplacer fetch et ytInitialPlayerResponse
+      allFrames: false,
+      persistAcrossSessions: true,
+    });
+  }
+  if (hideAds) {
+    scripts.push({
+      id: HIDER_SCRIPT_ID,
+      css: ["content/ad-hider.css"],
+      matches: YOUTUBE_MATCHES,
+      runAt: "document_start", // la feuille est en place avant l'affichage de la page
+      allFrames: false,
+      persistAcrossSessions: true,
+    });
+  }
+  return scripts;
+}
+
+// File d'attente des synchronisations, sur le modèle de statsQueue : deux synchronisations
+// simultanées pourraient enregistrer deux fois le même identifiant (erreur de Chrome).
+let scriptsQueue = Promise.resolve();
+
+/**
+ * Met les scripts enregistrés en accord avec les réglages enregistrés : retire ceux qui ne
+ * sont plus voulus, ajoute ceux qui manquent, ne touche pas aux autres.
+ * @returns {Promise<void>}
+ */
+function syncPageScripts() {
+  const run = scriptsQueue.then(async () => {
+    const wanted = pageScriptsFor(await Settings.loadSettings(chrome.storage.local));
+    const wantedIds = new Set(wanted.map((script) => script.id));
+    const registered = await chrome.scripting.getRegisteredContentScripts({ ids: PAGE_SCRIPT_IDS });
+    const registeredIds = new Set(registered.map((script) => script.id));
+
+    const toRemove = [...registeredIds].filter((id) => !wantedIds.has(id));
+    if (toRemove.length) await chrome.scripting.unregisterContentScripts({ ids: toRemove });
+    const toAdd = wanted.filter((script) => !registeredIds.has(script.id));
+    if (toAdd.length) await chrome.scripting.registerContentScripts(toAdd);
+  });
+  scriptsQueue = run.catch((error) => console.warn("[YouTube Ad Skip] scripts de blocage :", error));
+  return run;
+}
+
 // --- Traitement des messages -------------------------------------------------
 
 /**
@@ -305,6 +391,15 @@ chrome.debugger.onDetach.addListener((source) => {
 // Onglet fermé : détacher par précaution (sans effet si l'extension n'y était pas attachée).
 chrome.tabs.onRemoved.addListener((tabId) => detachDebugger(tabId));
 
+// Réglage de blocage ou de masquage modifié (popup, page d'options) : resynchroniser.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && ["enabled", "blockAds", "hideAds"].some((key) => key in changes)) syncPageScripts();
+});
+
+// Synchronisation à chaque démarrage du service worker : installation, mise à jour,
+// rechargement de l'extension ou redémarrage de Chrome. Sans effet si tout est déjà en place.
+syncPageScripts().catch(() => {}); // erreur déjà journalisée par la file d'attente
+
 // Export pour les tests Node. Dans Chrome, « module » n'existe pas : ce bloc est ignoré.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
@@ -313,6 +408,9 @@ if (typeof module !== "undefined" && module.exports) {
     isAuthorized,
     isValidPoint,
     handleMessage,
+    pageScriptsFor,
+    syncPageScripts,
+    PAGE_SCRIPT_IDS,
     attachedTabs,
     ATTACH_TIMEOUT_MS,
     SESSION_COUNT_KEY,

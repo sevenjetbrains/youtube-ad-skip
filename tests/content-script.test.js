@@ -97,12 +97,12 @@ test("réglages conservés après un redémarrage de Chrome (scénario 8)", asyn
   const storage = createFakeStorage(); // chrome.storage.local survit au redémarrage
   const before = setup({ storage });
   await waitFor(() => before.cs.settings);
-  await storage.local.set({ autoSkip: false, experimental: true }); // choix faits dans les options
+  await storage.local.set({ blockAds: false, autoSkip: false, experimental: true }); // choix faits dans les options
   before.stop(); // fermeture de l'onglet
 
   const after = setup({ storage }); // nouvel onglet après redémarrage
   await waitFor(() => after.cs.settings);
-  assert.deepEqual(after.cs.settings, { enabled: true, autoSkip: false, experimental: true });
+  assert.deepEqual(after.cs.settings, { enabled: true, blockAds: false, hideAds: true, autoSkip: false, experimental: true });
   after.stop();
 });
 

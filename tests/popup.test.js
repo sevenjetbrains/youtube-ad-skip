@@ -15,12 +15,17 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { describeStatus, formatCount } = require("../popup/popup.js");
 
-const DEFAULTS = { enabled: true, autoSkip: true, experimental: false };
+const DEFAULTS = { enabled: true, blockAds: true, hideAds: true, autoSkip: true, experimental: false };
 const active = (state) => ({ enabled: true, state });
 
 test("indicateur d'état selon les réglages et la réponse de l'onglet", () => {
   assert.equal(describeStatus({ ...DEFAULTS, enabled: false }, active("no-ad")).text, "En pause");
-  assert.match(describeStatus({ ...DEFAULTS, autoSkip: false }, active("no-ad")).text, /désactivé dans les paramètres/);
+  const blockOnly = { ...DEFAULTS, autoSkip: false };
+  assert.equal(describeStatus(blockOnly, active("no-ad")).tone, "ok", "blocage seul : actif");
+  assert.match(describeStatus(blockOnly, active("no-ad")).text, /blocage seul, clic automatique désactivé/);
+  const nothing = { ...blockOnly, blockAds: false, hideAds: false };
+  assert.equal(describeStatus(nothing, active("no-ad")).tone, "muted");
+  assert.match(describeStatus(nothing, active("no-ad")).text, /toutes les fonctions sont désactivées/);
   assert.match(describeStatus(DEFAULTS, null).text, /Inactif sur cet onglet/);
   assert.equal(describeStatus(DEFAULTS, active("no-ad")).tone, "ok");
   assert.equal(describeStatus(DEFAULTS, active("no-player")).tone, "ok");

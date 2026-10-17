@@ -22,7 +22,7 @@
       <h1>YouTube Ad Skip — paramètres</h1>
     </header>
 
-    <p class="intro">Les réglages sont enregistrés dans votre navigateur dès qu'ils changent et conservés après un redémarrage de Chrome. Ils s'appliquent tout de suite aux onglets YouTube ouverts.</p>
+    <p class="intro">Les réglages sont enregistrés dans votre navigateur dès qu'ils changent et conservés après un redémarrage de Chrome. Ils s'appliquent tout de suite aux onglets YouTube ouverts, sauf le blocage et le masquage, qui s'appliquent au prochain chargement de la page.</p>
 
     <!-- Liste des réglages : un <label class="setting"> cliquable par réglage. -->
     <section class="settings">
@@ -36,11 +36,31 @@
         <span class="switch" aria-hidden="true"></span>
       </label>
 
+      <!-- Réglage « blockAds » : retrait des publicités des données du lecteur (content/ad-blocker.js). -->
+      <label class="setting">
+        <span class="setting-text">
+          <span class="setting-title">Bloquer les publicités avant leur affichage</span>
+          <span class="setting-hint">Retire les publicités des données envoyées au lecteur, comme le navigateur Brave : la vidéo démarre directement. Prend effet au prochain chargement des pages YouTube.</span>
+        </span>
+        <input type="checkbox" data-setting="blockAds" role="switch">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+
+      <!-- Réglage « hideAds » : masquage des publicités hors du lecteur (content/ad-hider.css). -->
+      <label class="setting">
+        <span class="setting-text">
+          <span class="setting-title">Masquer les publicités de la page</span>
+          <span class="setting-hint">Cache les publicités de l'accueil, des résultats de recherche et de la colonne à côté de la vidéo. Prend effet au prochain chargement des pages YouTube.</span>
+        </span>
+        <input type="checkbox" data-setting="hideAds" role="switch">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+
       <!-- Réglage « autoSkip » : clic réel via chrome.debugger (content/ad-skipper.js). -->
       <label class="setting">
         <span class="setting-text">
           <span class="setting-title">Clic automatique sur « Ignorer »</span>
-          <span class="setting-hint">Clique sur le bouton dès qu'il est disponible. Chrome affiche alors brièvement le bandeau du débogueur.</span>
+          <span class="setting-hint">Solution de repli pour les publicités qui n'ont pas pu être bloquées : clique sur le bouton dès qu'il est disponible. Chrome affiche alors brièvement le bandeau du débogueur.</span>
         </span>
         <input type="checkbox" data-setting="autoSkip" role="switch">
         <span class="switch" aria-hidden="true"></span>

@@ -8,6 +8,7 @@
 2. **Recharger tous les onglets YouTube** : un onglet ouvert avant le rechargement garde l'ancien script, qui s'arrête de lui-même (la fenêtre affiche alors « Inactif sur cet onglet »).
 3. Ouvrir la console de l'onglet YouTube (F12 → Console) et filtrer sur `YouTube Ad Skip`. Chaque publicité réellement ignorée y écrit « publicité ignorée ».
 4. Pour obtenir des publicités : enchaîner plusieurs vidéos populaires, ou recharger une vidéo. Une session YouTube Premium n'en affiche pas.
+5. Pour tester le **clic automatique** (scénarios 2 à 5), désactiver d'abord « Bloquer les publicités avant leur affichage » et recharger l'onglet : sinon les publicités n'apparaissent plus.
 
 ## Scénarios du cahier des charges
 
@@ -24,6 +25,18 @@
 | 9 | Interface YouTube modifiée ou absente | Ouvrir l'accueil, une recherche, une page de chaîne, un Short | Aucune erreur dans la console. Fenêtre : « Actif — en attente d'une vidéo » sur les pages sans lecteur |
 | 10 | Erreur de détection | Recharger l'extension dans `chrome://extensions` sans recharger l'onglet YouTube, puis attendre une publicité | La page continue de fonctionner normalement. L'ancien script s'arrête (« extension rechargée » dans la console), aucun clic ni accélération ; fenêtre : « Inactif sur cet onglet ». Après rechargement de l'onglet, tout refonctionne |
 
+## Blocage et masquage (comme Brave)
+
+| Vérification | Actions | Résultat attendu |
+|---|---|---|
+| Blocage au premier chargement | Blocage activé. Ouvrir directement l'adresse d'une vidéo populaire, plusieurs fois | La vidéo démarre sans publicité, sans bandeau du débogueur. Console : `ytInitialPlayerResponse.adPlacements` vaut `undefined` |
+| Blocage en navigation interne | Depuis l'accueil, ouvrir une vidéo, puis une vidéo suggérée, puis une vidéo d'une playlist | Aucune publicité. Onglet Réseau, requête `player` ou `get_watch` : la réponse lue par la page ne contient plus `adPlacements` (vérifier dans la console avec un point d'arrêt, l'onglet Réseau montre la réponse brute) |
+| Repli sur le clic | Si une publicité passe malgré le blocage | Le bouton « Ignorer » est cliqué comme avant (scénario 2) |
+| Masquage | Accueil, recherche d'un produit (ex. « aspirateur »), page d'une vidéo | Aucune vignette « Sponsorisé », pas de grande publicité en haut de l'accueil, pas d'encart publicitaire à droite du lecteur. Les vidéos ordinaires et les bannières d'annonce de YouTube restent visibles |
+| Réglages | Désactiver le blocage, recharger l'onglet | Les publicités réapparaissent et sont traitées par le clic automatique. Réactiver, recharger : plus de publicités |
+| Avertissement anti-bloqueur | Regarder plusieurs vidéos d'affilée avec le blocage | Pas de fenêtre « les bloqueurs de publicités ne sont pas autorisés ». Si elle apparaît : le noter (date, vidéo) et désactiver le blocage |
+| Discrétion | Console de l'onglet : `fetch.toString()` | Affiche `function fetch() { [native code] }` |
+
 ## Fenêtre et paramètres
 
 | Vérification | Résultat attendu |
@@ -32,7 +45,8 @@
 | « Réinitialiser les statistiques » | Les deux compteurs reviennent à 0 |
 | Deux onglets YouTube avec publicités en même temps | « au total » augmente de 2, aucun incrément perdu |
 | « Paramètres » | La page d'options s'ouvre dans un onglet |
-| Couper « Clic automatique » (expérimental désactivé) | Fenêtre : « En pause — clic automatique désactivé dans les paramètres » ; aucune action pendant les publicités |
+| Couper « Clic automatique » (expérimental désactivé, blocage activé) | Fenêtre : « Actif — blocage seul, clic automatique désactivé dans les paramètres » ; aucun clic pendant les publicités |
+| Couper aussi le blocage et le masquage | Fenêtre : « En pause — toutes les fonctions sont désactivées dans les paramètres » |
 | Changer un réglage dans la page d'options pendant que la fenêtre est ouverte | La fenêtre suit le changement |
 | « Aide et informations » | La page d'aide s'ouvre |
 | Thème sombre de Windows | Fenêtre, options et aide lisibles en sombre |
@@ -41,7 +55,7 @@
 
 - **Bouton sans rapport** : pendant une publicité, aucun autre bouton (lecture, suivant, plein écran, lien de l'annonceur) n'est actionné.
 - **Ressources** : ouvrir le Gestionnaire de tâches de Chrome (Maj+Échap) pendant une vidéo sans publicité. L'extension ne doit pas consommer de processeur de façon notable. Hors publicité, elle n'observe qu'un attribut du lecteur ; elle ne vérifie toutes les 500 ms que pendant une publicité.
-- **Confidentialité** : outils de développement → onglet Réseau, filtrer sur `chrome-extension://`. L'extension ne fait aucune requête : elle ne contient ni `fetch` ni `XMLHttpRequest`.
+- **Confidentialité** : outils de développement → onglet Réseau, filtrer sur `chrome-extension://`. L'extension ne fait aucune requête. `content/ad-blocker.js` intercepte les `fetch` et `XMLHttpRequest` de YouTube pour en retirer les publicités, mais n'en émet aucun et n'envoie rien.
 
 ## Résultats du 14 et 15 octobre 2026 (Chrome, Windows 10)
 
